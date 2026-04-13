@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>里程碑1 · 随机单词</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f2ef;
+      --card: #fff;
+      --text: #1a1a1a;
+      --muted: #5c5c5c;
+      --accent: #0d745e;
+      --border: #e0dcd4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121412;
+        --card: #1c1f1d;
+        --text: #eceae6;
+        --muted: #a39e96;
+        --accent: #3ecfae;
+        --border: #2e3330;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 1.5rem;
+    }
+    .wrap {
+      max-width: 42rem;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 0 0 1rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    }
+    .word {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+    }
+    .meta {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .content {
+      font-size: 0.95rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      max-height: min(55vh, 28rem);
+      overflow-y: auto;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+      flex-wrap: wrap;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--accent);
+      color: #fff;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+    }
+    .err {
+      color: #b42318;
+      font-size: 0.9rem;
+      margin-top: 0.75rem;
+    }
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 1rem;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <h1>里程碑1：词表浏览</h1>
+    <div class="card">
+      <div class="word" id="word">加载中…</div>
+      <div class="meta" id="meta"></div>
+      <div class="content" id="content"></div>
+      <div class="actions">
+        <button type="button" id="next" disabled>下一个</button>
+        <button type="button" class="secondary" id="shuffle" disabled>随机</button>
+      </div>
+      <p class="err" id="err" hidden></p>
+      <p class="hint" id="hint"></p>
+    </div>
+  </div>
+  <script>
+    const DATA_URL = "/DictionaryByGPT4-main/gptwords.json";
+
+    const elWord = document.getElementById("word");
+    const elMeta = document.getElementById("meta");
+    const elContent = document.getElementById("content");
+    const elErr = document.getElementById("err");
+    const elHint = document.getElementById("hint");
+    const btnNext = document.getElementById("next");
+    const btnShuffle = document.getElementById("shuffle");
+
+    /** @type {{ word: string, content: string }[]} */
+    let entries = [];
+    let index = 0;
+
+    function parseJsonl(text) {
+      const out = [];
+      for (const line of text.split(/\r?\n/)) {
+        const t = line.trim();
+        if (!t) continue;
+        try {
+          const o = JSON.parse(t);
+          if (o && typeof o.word === "string") out.push(o);
+        } catch (_) { /* skip bad line */ }
+      }
+      return out;
+    }
+
+    function show(i) {
+      if (!entries.length) return;
+      index = ((i % entries.length) + entries.length) % entries.length;
+      const e = entries[index];
+      elWord.textContent = e.word;
+      elContent.textContent = e.content || "";
+      elMeta.textContent = `第 ${index + 1} / ${entries.length} 条`;
+    }
+
+    function showError(msg) {
+      elErr.hidden = false;
+      elErr.textContent = msg;
+      elWord.textContent = "无法加载";
+      elContent.textContent = "";
+      elMeta.textContent = "";
+    }
+
+    async function load() {
+      elHint.textContent = "";
+      try {
+        const res = await fetch(DATA_URL);
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const text = await res.text();
+        entries = parseJsonl(text);
+        if (!entries.length) throw new Error("词表为空或格式不对");
+        show(0);
+        btnNext.disabled = false;
+        btnShuffle.disabled = false;
+      } catch (e) {
+        showError(e instanceof Error ? e.message : String(e));
+        elHint.innerHTML =
+          "请在本目录运行 <code>python serve_milestone1.py</code>，浏览器打开提示的地址（不要直接用 file:// 打开本页）。";
+      }
+    }
+
+    btnNext.addEventListener("click", () => show(index + 1));
+    btnShuffle.addEventListener("click", () => {
+      if (entries.length < 2) return;
+      let j = index;
+      while (j === index) j = Math.floor(Math.random() * entries.length);
+      show(j);
+    });
+
+    load();
+  </script>
+</body>
+</html>

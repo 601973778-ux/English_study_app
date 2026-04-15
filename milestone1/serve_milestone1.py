@@ -13,7 +13,7 @@ import socketserver
 import webbrowser
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-PORT = 8765
+PORT = 8766
 
 
 def main() -> None:

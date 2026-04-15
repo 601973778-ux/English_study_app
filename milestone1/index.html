@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>里程碑1 · 随机单词</title>
+  <title>里程碑1 · 背单词</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -62,13 +62,12 @@
       color: var(--muted);
       margin-bottom: 1rem;
     }
-    .content {
+    .meaning {
       font-size: 0.95rem;
       line-height: 1.55;
       white-space: pre-wrap;
       word-break: break-word;
-      max-height: min(55vh, 28rem);
-      overflow-y: auto;
+      min-height: 3.2rem;
       border-top: 1px solid var(--border);
       padding-top: 1rem;
     }
@@ -110,14 +109,16 @@
 </head>
 <body>
   <div class="wrap">
-    <h1>里程碑1：词表浏览</h1>
+    <h1>里程碑1：背单词（认识/不认识）</h1>
     <div class="card">
-      <div class="word" id="word">加载中…</div>
+      <div class="word" id="word">点击“开始学习”</div>
       <div class="meta" id="meta"></div>
-      <div class="content" id="content"></div>
+      <div class="meaning" id="meaning">中文释义会在你点击“不认识”后显示。</div>
       <div class="actions">
-        <button type="button" id="next" disabled>下一个</button>
-        <button type="button" class="secondary" id="shuffle" disabled>随机</button>
+        <button type="button" id="start" disabled>开始学习（50词）</button>
+        <button type="button" id="known" disabled>认识</button>
+        <button type="button" class="secondary" id="unknown" disabled>不认识（显示中文）</button>
+        <button type="button" id="nextAfterMeaning" disabled hidden>下一个</button>
       </div>
       <p class="err" id="err" hidden></p>
       <p class="hint" id="hint"></p>
@@ -128,15 +129,22 @@
 
     const elWord = document.getElementById("word");
     const elMeta = document.getElementById("meta");
-    const elContent = document.getElementById("content");
+    const elMeaning = document.getElementById("meaning");
     const elErr = document.getElementById("err");
     const elHint = document.getElementById("hint");
-    const btnNext = document.getElementById("next");
-    const btnShuffle = document.getElementById("shuffle");
+    const btnStart = document.getElementById("start");
+    const btnKnown = document.getElementById("known");
+    const btnUnknown = document.getElementById("unknown");
+    const btnNextAfterMeaning = document.getElementById("nextAfterMeaning");
 
-    /** @type {{ word: string, content: string }[]} */
+    /** @type {{ words: string, content: string }[]} */
     let entries = [];
+    let session = [];
     let index = 0;
+    let knownCount = 0;
+    let unknownCount = 0;
+    let waitingNextAfterMeaning = false;
+    const SESSION_SIZE = 50;
 
     function parseJsonl(text) {
       const out = [];
@@ -145,27 +153,72 @@
         if (!t) continue;
         try {
           const o = JSON.parse(t);
-          if (o && typeof o.word === "string") out.push(o);
+          if (!o) continue;
+          const words = typeof o.words === "string" ? o.words : (typeof o.word === "string" ? o.word : "");
+          if (words) {
+            out.push({
+              words,
+              content: typeof o.content === "string" ? o.content : "",
+            });
+          }
         } catch (_) { /* skip bad line */ }
       }
       return out;
     }
 
-    function show(i) {
-      if (!entries.length) return;
-      index = ((i % entries.length) + entries.length) % entries.length;
-      const e = entries[index];
-      elWord.textContent = e.word;
-      elContent.textContent = e.content || "";
-      elMeta.textContent = `第 ${index + 1} / ${entries.length} 条`;
+    function pickRandom(items, count) {
+      const copy = [...items];
+      for (let i = copy.length - 1; i > 0; i--) {
+        const j = Math.floor(Math.random() * (i + 1));
+        [copy[i], copy[j]] = [copy[j], copy[i]];
+      }
+      return copy.slice(0, Math.min(count, copy.length));
+    }
+
+    function showCurrentWord() {
+      const current = session[index];
+      if (!current) return;
+      elWord.textContent = current.words;
+      elMeaning.textContent = "中文释义会在你点击“不认识”后显示。";
+      elMeta.textContent = `第 ${index + 1} / ${session.length} 个 | 认识 ${knownCount} | 不认识 ${unknownCount}`;
+      waitingNextAfterMeaning = false;
+      btnNextAfterMeaning.hidden = true;
+      btnNextAfterMeaning.disabled = true;
+      btnKnown.disabled = false;
+      btnUnknown.disabled = false;
+    }
+
+    function finishSession() {
+      elWord.textContent = "本次学习完成";
+      elMeaning.textContent = "你可以点击“开始学习”开启下一轮 50 词。";
+      elMeta.textContent = `总计 ${session.length} 个 | 认识 ${knownCount} | 不认识 ${unknownCount}`;
+      btnKnown.disabled = true;
+      btnUnknown.disabled = true;
+      btnNextAfterMeaning.hidden = true;
+      btnNextAfterMeaning.disabled = true;
+      btnStart.disabled = false;
+    }
+
+    function nextWord() {
+      index += 1;
+      if (index >= session.length) {
+        finishSession();
+        return;
+      }
+      showCurrentWord();
     }
 
     function showError(msg) {
       elErr.hidden = false;
       elErr.textContent = msg;
       elWord.textContent = "无法加载";
-      elContent.textContent = "";
+      elMeaning.textContent = "";
       elMeta.textContent = "";
+      btnStart.disabled = true;
+      btnKnown.disabled = true;
+      btnUnknown.disabled = true;
+      btnNextAfterMeaning.hidden = true;
+      btnNextAfterMeaning.disabled = true;
     }
 
     async function load() {
@@ -176,9 +229,8 @@
         const text = await res.text();
         entries = parseJsonl(text);
         if (!entries.length) throw new Error("词表为空或格式不对");
-        show(0);
-        btnNext.disabled = false;
-        btnShuffle.disabled = false;
+        btnStart.disabled = false;
+        elMeta.textContent = `词库加载成功，共 ${entries.length} 条`;
       } catch (e) {
         showError(e instanceof Error ? e.message : String(e));
         elHint.innerHTML =
@@ -186,12 +238,42 @@
       }
     }
 
-    btnNext.addEventListener("click", () => show(index + 1));
-    btnShuffle.addEventListener("click", () => {
-      if (entries.length < 2) return;
-      let j = index;
-      while (j === index) j = Math.floor(Math.random() * entries.length);
-      show(j);
+    btnStart.addEventListener("click", () => {
+      session = pickRandom(entries, SESSION_SIZE);
+      index = 0;
+      knownCount = 0;
+      unknownCount = 0;
+      btnStart.disabled = true;
+      btnKnown.disabled = false;
+      btnUnknown.disabled = false;
+      btnNextAfterMeaning.hidden = true;
+      btnNextAfterMeaning.disabled = true;
+      showCurrentWord();
+    });
+
+    btnKnown.addEventListener("click", () => {
+      if (waitingNextAfterMeaning) return;
+      if (!session.length || index >= session.length) return;
+      knownCount += 1;
+      nextWord();
+    });
+
+    btnUnknown.addEventListener("click", () => {
+      if (waitingNextAfterMeaning) return;
+      if (!session.length || index >= session.length) return;
+      unknownCount += 1;
+      const current = session[index];
+      elMeaning.textContent = `词义：${current.content || "（暂无词义）"}`;
+      waitingNextAfterMeaning = true;
+      btnKnown.disabled = true;
+      btnUnknown.disabled = true;
+      btnNextAfterMeaning.hidden = false;
+      btnNextAfterMeaning.disabled = false;
+    });
+
+    btnNextAfterMeaning.addEventListener("click", () => {
+      if (!waitingNextAfterMeaning) return;
+      nextWord();
     });
 
     load();

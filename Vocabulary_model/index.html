@@ -1,0 +1,314 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>里程碑1 · 背单词</title>
+  <style>
+    :root {
+      color-scheme: light dark;
+      --bg: #f4f2ef;
+      --card: #fff;
+      --text: #1a1a1a;
+      --muted: #5c5c5c;
+      --accent: #0d745e;
+      --border: #e0dcd4;
+    }
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121412;
+        --card: #1c1f1d;
+        --text: #eceae6;
+        --muted: #a39e96;
+        --accent: #3ecfae;
+        --border: #2e3330;
+      }
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: "Segoe UI", system-ui, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      padding: 1.5rem;
+    }
+    .wrap {
+      max-width: 42rem;
+      margin: 0 auto;
+    }
+    h1 {
+      font-size: 1.1rem;
+      font-weight: 600;
+      color: var(--muted);
+      margin: 0 0 1rem;
+    }
+    .card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 1.25rem 1.5rem;
+      box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    }
+    .word {
+      font-size: 1.75rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+      margin-bottom: 0.75rem;
+      color: var(--accent);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    .speak {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 2.2rem;
+      height: 2.2rem;
+      padding: 0;
+      border-radius: 999px;
+      border: 1px solid var(--border);
+      background: transparent;
+      color: var(--text);
+      cursor: pointer;
+      flex: 0 0 auto;
+    }
+    .speak:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    .speak[hidden] {
+      display: none;
+    }
+    .meta {
+      font-size: 0.85rem;
+      color: var(--muted);
+      margin-bottom: 1rem;
+    }
+    .meaning {
+      font-size: 0.95rem;
+      line-height: 1.55;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 3.2rem;
+      border-top: 1px solid var(--border);
+      padding-top: 1rem;
+    }
+    .actions {
+      display: flex;
+      gap: 0.75rem;
+      margin-top: 1.25rem;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      font: inherit;
+      cursor: pointer;
+      padding: 0.6rem 1.2rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      background: var(--accent);
+      color: #fff;
+    }
+    button.primaryAction {
+      min-width: 9.5rem;
+      text-align: center;
+    }
+    button:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+    button.secondary {
+      background: transparent;
+      color: var(--text);
+    }
+    .err {
+      color: #b42318;
+      font-size: 0.9rem;
+      margin-top: 0.75rem;
+    }
+    .hint {
+      font-size: 0.8rem;
+      color: var(--muted);
+      margin-top: 1rem;
+      line-height: 1.4;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <div class="word">
+        <span id="word">点击“开始学习”</span>
+        <button type="button" class="speak" id="speak" hidden disabled title="播放英文发音">🔊</button>
+      </div>
+      <div class="meta" id="meta"></div>
+      <div class="meaning" id="meaning">中文释义会在你作答后显示。</div>
+      <div class="actions">
+        <button type="button" id="start" disabled>开始学习</button>
+        <button type="button" class="primaryAction" id="known" disabled>我认识</button>
+        <button type="button" class="secondary primaryAction" id="unknown" disabled>我不认识</button>
+        <button type="button" class="secondary" id="mistakeAfterKnown" disabled hidden>记错了</button>
+        <button type="button" id="nextAfterMeaning" disabled hidden>下一个</button>
+      </div>
+      <p class="err" id="err" hidden></p>
+      <p class="hint" id="hint"></p>
+    </div>
+  </div>
+  <script>
+    const elWord = document.getElementById("word");
+    const btnSpeak = document.getElementById("speak");
+    const elMeta = document.getElementById("meta");
+    const elMeaning = document.getElementById("meaning");
+    const elErr = document.getElementById("err");
+    const elHint = document.getElementById("hint");
+    const btnStart = document.getElementById("start");
+    const btnKnown = document.getElementById("known");
+    const btnUnknown = document.getElementById("unknown");
+    const btnMistakeAfterKnown = document.getElementById("mistakeAfterKnown");
+    const btnNextAfterMeaning = document.getElementById("nextAfterMeaning");
+
+    function showError(msg) {
+      elErr.hidden = false;
+      elErr.textContent = msg;
+      elWord.textContent = "无法加载";
+      elMeaning.textContent = "";
+      elMeta.textContent = "";
+      btnStart.disabled = true;
+      btnKnown.disabled = true;
+      btnUnknown.disabled = true;
+      btnMistakeAfterKnown.hidden = true;
+      btnMistakeAfterKnown.disabled = true;
+      btnNextAfterMeaning.hidden = true;
+      btnNextAfterMeaning.disabled = true;
+    }
+
+    function render(state) {
+      elErr.hidden = true;
+      elHint.textContent = "";
+
+      elWord.textContent = state && typeof state.word === "string" ? state.word : "";
+      elMeaning.textContent = state && typeof state.meaning === "string" ? state.meaning : "";
+      elMeta.textContent = state && typeof state.meta === "string" ? state.meta : "";
+
+      const ui = (state && state.ui) || {};
+      btnStart.disabled = !ui.startEnabled;
+      btnKnown.disabled = !ui.knownEnabled;
+      btnUnknown.disabled = !ui.unknownEnabled;
+      // 学习开始后隐藏“开始学习”，本轮完成后再显示
+      btnStart.hidden = !ui.startEnabled;
+
+      // 仅在“展示词义”阶段显示喇叭与后续操作
+      const inMeaningPhase = state && state.phase === "meaning" && !!ui.showNext;
+      btnKnown.hidden = inMeaningPhase;
+      btnUnknown.hidden = inMeaningPhase;
+
+      // 只在展示词义时展示喇叭按钮（避免在“认识/不认识”判别阶段出现）
+      btnSpeak.hidden = !inMeaningPhase;
+      btnSpeak.disabled = !inMeaningPhase;
+
+      btnMistakeAfterKnown.hidden = !ui.showMistake;
+      btnMistakeAfterKnown.disabled = !ui.showMistake;
+      btnNextAfterMeaning.hidden = !ui.showNext;
+      btnNextAfterMeaning.disabled = !ui.showNext;
+    }
+
+    let currentAudioUrl = null;
+    async function speakCurrentWord() {
+      const text = (elWord.textContent || "").trim();
+      if (!text) return;
+      btnSpeak.disabled = true;
+      try {
+        const res = await fetch(`/api/tts?text=${encodeURIComponent(text)}`, { method: "GET" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data && data.error ? data.error : `HTTP ${res.status}`);
+        }
+        const blob = await res.blob();
+        if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
+        currentAudioUrl = URL.createObjectURL(blob);
+        const audio = new Audio(currentAudioUrl);
+        await audio.play();
+      } catch (e) {
+        showError(e instanceof Error ? e.message : String(e));
+      } finally {
+        btnSpeak.disabled = btnSpeak.hidden;
+      }
+    }
+
+    async function apiGet(path) {
+      const res = await fetch(path, { method: "GET" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data && data.error ? data.error : `HTTP ${res.status}`);
+      return data;
+    }
+
+    async function apiPost(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data && data.error ? data.error : `HTTP ${res.status}`);
+      return data;
+    }
+
+    async function init() {
+      try {
+        const state = await apiGet("/api/state");
+        render(state);
+      } catch (e) {
+        showError(e instanceof Error ? e.message : String(e));
+        elHint.innerHTML =
+          "请在本目录运行 <code>python serve_milestone1.py</code>，浏览器打开提示的地址（不要直接用 file:// 打开本页）。";
+      }
+    }
+
+    btnStart.addEventListener("click", async () => {
+      try {
+        render(await apiPost("/api/start", { count: 50 }));
+      } catch (e) {
+        showError(e instanceof Error ? e.message : String(e));
+      }
+    });
+
+    btnKnown.addEventListener("click", async () => {
+      try {
+        render(await apiPost("/api/known"));
+      } catch (e) {
+        showError(e instanceof Error ? e.message : String(e));
+      }
+    });
+
+    btnUnknown.addEventListener("click", async () => {
+      try {
+        render(await apiPost("/api/unknown"));
+      } catch (e) {
+        showError(e instanceof Error ? e.message : String(e));
+      }
+    });
+
+    btnMistakeAfterKnown.addEventListener("click", async () => {
+      try {
+        render(await apiPost("/api/mistake"));
+      } catch (e) {
+        showError(e instanceof Error ? e.message : String(e));
+      }
+    });
+
+    btnNextAfterMeaning.addEventListener("click", async () => {
+      try {
+        render(await apiPost("/api/next"));
+      } catch (e) {
+        showError(e instanceof Error ? e.message : String(e));
+      }
+    });
+
+    btnSpeak.addEventListener("click", speakCurrentWord);
+
+    init();
+  </script>
+</body>
+</html>

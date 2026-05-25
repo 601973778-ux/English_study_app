@@ -22,8 +22,9 @@ def extract_pure_meaning(content):
     for pattern in meaning_patterns:
         matches = re.findall(pattern, content)
         for m in matches:
-            # 清洗提取出的文字：去除可能误抓的英文点号、空格等
-            clean_m = re.sub(r'[a-zA-Z.．]', '', m).strip(' ，、；')
+            # 清洗提取出的文字：去除误抓的英文字符，英文逗号规范为中文逗号
+            clean_m = re.sub(r'[a-zA-Z.．]', '', m)
+            clean_m = re.sub(r'\s*,\s*', '，', clean_m).strip(' ，、；,')
             # 确保提取到的是包含中文字符的内容且不重复
             if clean_m and any('\u4e00' <= char <= '\u9fa5' for char in clean_m):
                 if clean_m not in results:

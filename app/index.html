@@ -1,0 +1,746 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>单词背诵 · 单词学习</title>
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.3.4.3.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.1.0.7.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/echarts.min.5.4.3.js"></script>
+<style>
+  body { background-color: #F4F4F4; font-family: 'Noto Sans SC', 'Inter', sans-serif; }
+  .card-shadow { box-shadow: 0 2px 12px 0 rgba(0,0,0,.08); }
+  .sidebar-item-active {
+    background-color: #EBF5FF;
+    border-right: 4px solid #2563EB;
+    color: #2563EB;
+  }
+  .custom-scrollbar::-webkit-scrollbar { width: 4px; }
+  .custom-scrollbar::-webkit-scrollbar-thumb { background: #E0E0E0; border-radius: 10px; }
+  .wip-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    background: #FEF3C7;
+    color: #B45309;
+    font-size: 11px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 999px;
+  }
+  .wip-overlay { position: relative; }
+  .wip-overlay::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: rgba(255,255,255,.55);
+    pointer-events: none;
+    border-radius: inherit;
+  }
+  .meaning-scroll {
+    max-height: 280px;
+    overflow-y: auto;
+    white-space: pre-wrap;
+    word-break: break-word;
+    line-height: 1.7;
+    color: #1f2937;
+    font-size: 14px;
+  }
+  .err-banner {
+    background: #FEF2F2;
+    color: #B91C1C;
+    border: 1px solid #FECACA;
+    padding: 10px 14px;
+    border-radius: 8px;
+    font-size: 13px;
+  }
+</style>
+</head>
+<body class="h-screen overflow-hidden flex text-[#101010]">
+
+<aside class="w-[280px] bg-white h-full flex flex-col border-r border-[#E0E0E0] z-10 shrink-0">
+  <div class="p-8">
+    <h1 class="text-[26px] font-bold text-[#2563EB] tracking-tight flex items-center gap-2">
+      <iconify-icon icon="ph:book-open-bold"></iconify-icon>
+      单词学习
+    </h1>
+    <p class="text-xs text-[#5C5C5C] mt-1">未来语言学习工作站</p>
+  </div>
+  <nav class="flex-1 px-4 space-y-2 mt-4 overflow-y-auto custom-scrollbar">
+    <div class="text-[11px] font-semibold text-[#9CA3AF] px-4 py-2 uppercase tracking-wider">核心学习模块</div>
+    <a class="sidebar-item-active flex items-center gap-3 px-4 py-3 rounded-lg transition-all" href="/app/index.html">
+      <iconify-icon class="text-xl" icon="ph:book-open-bold"></iconify-icon>
+      <span class="font-medium">单词背诵</span>
+    </a>
+    <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#5C5C5C] hover:bg-gray-50 transition-all" href="/app/pages/oral.html">
+      <iconify-icon class="text-xl" icon="ph:microphone-stage-bold"></iconify-icon>
+      <span class="font-medium">口语发音训练</span>
+    </a>
+    <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#5C5C5C] hover:bg-gray-50 transition-all" href="/app/pages/listening.html">
+      <iconify-icon class="text-xl" icon="ph:headphones-bold"></iconify-icon>
+      <span class="font-medium">听力练习</span>
+    </a>
+    <div class="text-[11px] font-semibold text-[#9CA3AF] px-4 py-2 mt-6 uppercase tracking-wider">个人数据</div>
+    <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#5C5C5C] hover:bg-gray-50 transition-all" href="/app/pages/progress.html">
+      <iconify-icon class="text-xl" icon="ph:chart-line-up-bold"></iconify-icon>
+      <span class="font-medium">学习进度</span>
+    </a>
+    <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#5C5C5C] hover:bg-gray-50 transition-all" href="/app/pages/wordbook.html">
+      <iconify-icon class="text-xl" icon="ph:bookmarks-bold"></iconify-icon>
+      <span class="font-medium">生词本</span>
+    </a>
+    <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#5C5C5C] hover:bg-gray-50 transition-all" href="/app/pages/settings.html">
+      <iconify-icon class="text-xl" icon="ph:gear-six-bold"></iconify-icon>
+      <span class="font-medium">用户学习设置</span>
+    </a>
+    <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#5C5C5C] hover:bg-gray-50 transition-all" href="/app/pages/api-config.html">
+      <iconify-icon class="text-xl" icon="ph:plugs-connected-bold"></iconify-icon>
+      <span class="font-medium">API 接入配置</span>
+    </a>
+    <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#5C5C5C] hover:bg-gray-50 transition-all" href="/app/pages/stats.html">
+      <iconify-icon class="text-xl" icon="ph:presentation-chart-bold"></iconify-icon>
+      <span class="font-medium">学习统计</span>
+    </a>
+  </nav>
+  <div class="p-6 border-t border-[#E0E0E0]">
+    <div class="mb-3">
+      <label for="sidebar-wordbook" class="block text-[11px] font-semibold text-[#9CA3AF] uppercase tracking-wider mb-1.5">当前词书</label>
+      <select id="sidebar-wordbook" class="w-full text-xs border border-gray-200 rounded-lg px-2 py-2 bg-white text-gray-800 outline-none focus:ring-2 focus:ring-blue-500/30">
+      </select>
+      <p id="wordbook-hint" class="text-[10px] text-gray-400 mt-1 hidden">已切换，请重新开始学习以使用新词书。</p>
+    </div>
+    <div class="bg-blue-50 p-4 rounded-xl">
+      <p class="text-[13px] text-blue-700 font-medium">今日目标: <span id="goal-total">50</span> 单词</p>
+      <div class="w-full bg-blue-200 h-1.5 rounded-full mt-2">
+        <div id="goal-bar" class="bg-blue-600 h-1.5 rounded-full transition-all" style="width:0%"></div>
+      </div>
+      <p class="text-[11px] text-blue-500 mt-2 text-right">已完成 <span id="goal-done">0</span>/<span id="goal-total2">50</span></p>
+    </div>
+  </div>
+</aside>
+
+<main class="flex-1 flex flex-col overflow-hidden min-w-0">
+  <header class="h-16 bg-white border-b border-[#E0E0E0] flex items-center justify-between px-8 shrink-0">
+    <div class="flex items-center gap-4 bg-gray-100 px-4 py-2 rounded-lg w-[min(400px,40vw)] max-w-full">
+      <iconify-icon class="text-gray-400 shrink-0" icon="ph:magnifying-glass"></iconify-icon>
+      <input class="bg-transparent border-none outline-none text-sm w-full min-w-0" placeholder="搜索单词、词根或语法点..." type="text" disabled>
+      <span class="wip-badge shrink-0">开发中</span>
+    </div>
+    <div class="flex items-center gap-6 shrink-0">
+      <div class="text-sm font-medium text-[#5C5C5C]">
+        <span class="bg-blue-100 text-blue-600 px-2 py-0.5 rounded mr-2">今日</span>
+        <span id="today-date">--</span>
+      </div>
+      <div class="hidden sm:flex items-center gap-3">
+        <div class="w-8 h-8 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white text-xs font-bold">U</div>
+        <span class="text-sm font-semibold">User</span>
+      </div>
+    </div>
+  </header>
+
+  <div id="err-banner" class="err-banner mx-8 mt-4 shrink-0" hidden>
+    <strong>提示：</strong> <span id="err-text"></span>
+    <p class="mt-2 text-xs text-[#5C5C5C]">
+      请在仓库根目录执行 <code class="bg-white px-1.5 py-0.5 rounded text-xs">python app/server.py</code> 后通过该地址访问（勿用 file://）。
+    </p>
+  </div>
+
+  <div class="flex-1 p-8 overflow-y-auto custom-scrollbar">
+    <div class="max-w-[1400px] mx-auto grid grid-cols-12 gap-6">
+
+      <div class="col-span-12 lg:col-span-7 bg-white rounded-xl p-8 card-shadow border border-[#E0E0E0] min-h-[400px] flex flex-col">
+        <div class="flex justify-between items-start gap-4 flex-wrap">
+          <div>
+            <div class="flex items-center gap-3 flex-wrap">
+              <h2 id="word" class="text-[clamp(28px,4vw,48px)] font-bold text-[#101010] tracking-tight leading-none">点击「开始学习」</h2>
+              <span id="phonetic" class="hidden text-[clamp(14px,2.2vw,20px)] text-slate-600 font-serif tracking-wide" lang="en"></span>
+              <button id="speak" type="button" hidden disabled
+                class="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600 hover:bg-blue-600 hover:text-white transition-all active:scale-90 disabled:opacity-40 disabled:cursor-not-allowed"
+                title="播放英文发音（/api/tts，可在 API 接入配置页填写讯飞密钥）">
+                <iconify-icon class="text-xl" icon="ph:speaker-high-fill"></iconify-icon>
+              </button>
+            </div>
+            <p id="word-progress" class="hidden mt-2 text-sm font-medium text-amber-700"></p>
+            <div id="daily-plan-progress" class="mt-3 space-y-0.5 text-sm text-[#5C5C5C]">
+              <p>待复习：<span id="prog-review-done">0</span>/<span id="prog-review-total">0</span></p>
+              <p>待学习：<span id="prog-new-done">0</span>/<span id="prog-new-total">0</span></p>
+            </div>
+            <p id="meta" class="hidden" aria-hidden="true"></p>
+          </div>
+          <button class="flex items-center gap-2 text-sm text-gray-400 font-medium cursor-not-allowed shrink-0" disabled title="生词本功能开发中">
+            <iconify-icon icon="ph:star-bold"></iconify-icon> 加入生词本
+            <span class="wip-badge ml-1">开发中</span>
+          </button>
+        </div>
+        <div class="mt-8 flex-1">
+          <h3 class="text-sm font-bold text-blue-600 uppercase border-l-4 border-blue-600 pl-3 mb-3">词义（词性 + 释义）</h3>
+          <div id="meaning" class="meaning-scroll p-4 bg-gray-50 rounded-lg">中文释义会在你作答后显示。</div>
+          <div id="example-wrap" class="mt-4 hidden">
+            <h3 class="text-sm font-bold text-amber-700 uppercase border-l-4 border-amber-500 pl-3 mb-2">示例与短句</h3>
+            <div id="example-text" class="meaning-scroll p-4 bg-amber-50/80 border border-amber-100 rounded-lg text-gray-800 text-sm"></div>
+          </div>
+        </div>
+        <div id="actions" class="mt-6 pt-4 border-t border-gray-100 flex flex-wrap gap-3 justify-center">
+          <button id="start" type="button"
+            class="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <iconify-icon icon="ph:play-fill" class="mr-1"></iconify-icon> <span id="start-label">开始学习</span>
+          </button>
+          <button id="known" type="button" hidden disabled
+            class="px-6 py-2.5 rounded-lg bg-emerald-600 text-white font-semibold text-sm hover:bg-emerald-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <iconify-icon icon="ph:check-bold" class="mr-1"></iconify-icon> 我认识
+          </button>
+          <button id="unknown" type="button" hidden disabled
+            class="px-6 py-2.5 rounded-lg bg-rose-500 text-white font-semibold text-sm hover:bg-rose-600 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <iconify-icon icon="ph:x-bold" class="mr-1"></iconify-icon> 我不认识
+          </button>
+          <button id="mistake" type="button" hidden disabled
+            class="px-6 py-2.5 rounded-lg border border-amber-400 text-amber-700 bg-amber-50 font-semibold text-sm hover:bg-amber-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <iconify-icon icon="ph:warning-circle-bold" class="mr-1"></iconify-icon> 记错了
+          </button>
+          <button id="next" type="button" hidden disabled
+            class="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            下一个 <iconify-icon icon="ph:arrow-right-bold" class="ml-1"></iconify-icon>
+          </button>
+        </div>
+      </div>
+
+      <div class="col-span-12 lg:col-span-5 bg-white rounded-xl p-8 card-shadow border border-[#E0E0E0] flex flex-col relative">
+        <div class="flex items-center justify-between mb-6 flex-wrap gap-2">
+          <div class="flex items-center gap-2">
+            <iconify-icon class="text-xl text-blue-600" icon="ph:magic-wand-fill"></iconify-icon>
+            <h3 class="text-lg font-bold">AI 情境联想故事</h3>
+            <span class="wip-badge">开发中</span>
+          </div>
+          <button class="text-xs bg-gray-100 px-3 py-1 rounded-full flex items-center gap-1 cursor-not-allowed text-gray-400 shrink-0" disabled>
+            <iconify-icon icon="ph:arrows-clockwise-bold"></iconify-icon> 重新生成
+          </button>
+        </div>
+        <div class="flex-1 wip-overlay">
+          <div class="relative z-10 space-y-4">
+            <p class="text-[#101010] leading-relaxed text-lg font-serif">
+              In the heart of the ancient library, young Elara climbed the tallest ladder. Her
+              <span class="text-blue-600 font-bold decoration-wavy underline">perspective</span>
+              shifted as she looked down at the dusty scrolls.
+            </p>
+            <div class="pt-4 border-t border-dashed border-gray-200">
+              <p class="text-[#5C5C5C] text-sm leading-relaxed">
+                在古老图书馆的核心位置，年幼的艾拉爬上了最高的梯子。当她俯视那些布满灰尘的卷轴时，她的<span class="font-bold">视角</span>发生了转变。
+              </p>
+            </div>
+          </div>
+          <div class="mt-8 p-4 bg-blue-50 rounded-xl border border-blue-100">
+            <div class="flex items-center gap-3">
+              <div class="w-10 h-10 rounded-full bg-blue-600 flex items-center justify-center text-white">
+                <iconify-icon icon="ph:brain-bold"></iconify-icon>
+              </div>
+              <div>
+                <h4 class="text-sm font-bold text-blue-800">记忆提示 (AI Advice)</h4>
+                <p class="text-xs text-blue-600 mt-0.5">联想「看(spect)」和「通过(per)」，即「看穿/透视」。</p>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-span-12 lg:col-span-7 bg-white rounded-xl p-8 card-shadow border border-[#E0E0E0] min-h-[360px] relative">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <div>
+            <div class="flex items-center gap-2 mb-4">
+              <h3 class="text-lg font-bold">词根词缀</h3>
+              <span class="wip-badge">开发中</span>
+            </div>
+            <div class="wip-overlay rounded-lg">
+              <h3 class="text-sm font-bold text-blue-600 uppercase border-l-4 border-blue-600 pl-3 mb-6">Etymology</h3>
+              <div class="space-y-6">
+                <div class="flex items-center gap-4">
+                  <div class="w-12 h-12 rounded bg-gray-50 flex flex-col items-center justify-center border border-gray-100">
+                    <span class="text-xs font-bold text-gray-400">Prefix</span>
+                    <span class="font-bold text-blue-600">per-</span>
+                  </div>
+                  <div>
+                    <p class="font-bold">through / thorough</p>
+                    <p class="text-xs text-[#5C5C5C]">贯穿，完全，彻底</p>
+                  </div>
+                </div>
+                <div class="flex items-center gap-4">
+                  <div class="w-12 h-12 rounded bg-gray-50 flex flex-col items-center justify-center border border-gray-100">
+                    <span class="text-xs font-bold text-gray-400">Root</span>
+                    <span class="font-bold text-blue-600">spect</span>
+                  </div>
+                  <div>
+                    <p class="font-bold">to look / watch</p>
+                    <p class="text-xs text-[#5C5C5C]">看，观察</p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div>
+            <div class="flex items-center gap-2 mb-4 flex-wrap">
+              <h3 class="text-lg font-bold">形近词</h3>
+              <span class="text-[10px] font-semibold uppercase text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded">已接 /api/similar-for</span>
+            </div>
+            <div id="similarWordsPanel" class="hidden border border-gray-100 rounded-lg p-4 bg-gray-50 min-h-[120px]">
+              <div class="flex flex-wrap items-center gap-2 mb-2">
+                <button type="button" id="btnLoadSimilar" class="text-xs px-3 py-1.5 rounded-lg border border-gray-300 bg-white hover:bg-gray-100">显示形近词</button>
+                <span id="similarWordsStatus" class="text-xs text-gray-500"></span>
+              </div>
+              <ul id="similarWordsList" class="text-sm pl-4 space-y-1 text-gray-800 max-h-48 overflow-y-auto"></ul>
+            </div>
+            <p id="similar-placeholder" class="text-sm text-gray-400">进入「释义」阶段后将显示形近词及其释义1。</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-span-12 lg:col-span-5 bg-white rounded-xl p-8 card-shadow border border-[#E0E0E0] flex flex-col relative">
+        <div class="flex items-center gap-2 mb-6">
+          <h3 class="text-lg font-bold">口语 / 听力训练</h3>
+          <span class="wip-badge">开发中</span>
+        </div>
+        <div class="space-y-6 flex-1 wip-overlay">
+          <div class="bg-gray-900 rounded-xl p-6">
+            <div class="flex justify-between items-center mb-4">
+              <span class="text-xs text-gray-400 font-mono tracking-widest">WAVEFORM ANALYZER</span>
+              <span class="flex items-center gap-2 text-green-400 text-xs">
+                <span class="w-2 h-2 rounded-full bg-green-400 animate-pulse"></span> RECORDING
+              </span>
+            </div>
+            <div class="h-24 w-full" id="waveform-chart"></div>
+            <div class="mt-4 flex justify-center">
+              <button class="w-16 h-16 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-lg" disabled type="button">
+                <iconify-icon class="text-3xl" icon="ph:microphone-fill"></iconify-icon>
+              </button>
+            </div>
+          </div>
+          <div class="space-y-4">
+            <p class="text-sm font-bold text-[#5C5C5C]">听力挖空练习</p>
+            <div class="p-6 bg-blue-50 rounded-xl border border-blue-100 flex flex-col items-center gap-4">
+              <p class="text-center font-medium italic">"His painting uses ______ to create depth."</p>
+              <div class="flex gap-2 w-full">
+                <input class="flex-1 px-4 py-2 rounded-lg border border-blue-200 outline-none text-sm" placeholder="输入你听到的单词..." disabled>
+                <button type="button" class="bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-bold" disabled>检查</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="col-span-12 bg-white rounded-xl p-6 card-shadow border border-[#E0E0E0] mb-8">
+        <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 lg:divide-x lg:divide-gray-100">
+          <div class="px-4 text-center">
+            <p class="text-xs text-[#5C5C5C] font-medium uppercase tracking-wider">今日学习单词</p>
+            <p class="text-[28px] sm:text-[32px] font-bold mt-1">
+              <span id="stat-known">0</span><span class="text-lg text-gray-400 font-normal"> / <span id="stat-total">50</span></span>
+            </p>
+          </div>
+          <div class="px-4 text-center relative">
+            <p class="text-xs text-[#5C5C5C] font-medium uppercase tracking-wider">平均发音准确度</p>
+            <p class="text-[28px] sm:text-[32px] font-bold mt-1 text-gray-300">--<span class="text-lg font-normal">%</span></p>
+            <span class="wip-badge absolute top-0 right-2 sm:right-4">开发中</span>
+          </div>
+          <div class="px-4 text-center relative">
+            <p class="text-xs text-[#5C5C5C] font-medium uppercase tracking-wider">听力训练时长</p>
+            <p class="text-[28px] sm:text-[32px] font-bold mt-1 text-gray-300">--<span class="text-lg text-gray-400 font-normal"> min</span></p>
+            <span class="wip-badge absolute top-0 right-2 sm:right-4">开发中</span>
+          </div>
+          <div class="px-4 text-center">
+            <p class="text-xs text-[#5C5C5C] font-medium uppercase tracking-wider">本轮模糊 / 不认识</p>
+            <p class="text-[28px] sm:text-[32px] font-bold mt-1">
+              <span id="stat-fuzzy" class="text-amber-500">0</span>
+              <span class="text-lg text-gray-300 font-normal"> / </span>
+              <span id="stat-unknown" class="text-rose-500">0</span>
+            </p>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</main>
+
+<script>
+  const $ = (id) => document.getElementById(id);
+  const elWord = $("word");
+  const elWordProgress = $("word-progress");
+  const elMeta = $("meta");
+  const progReviewDone = $("prog-review-done");
+  const progReviewTotal = $("prog-review-total");
+  const progNewDone = $("prog-new-done");
+  const progNewTotal = $("prog-new-total");
+  const elMeaning = $("meaning");
+  const elPhonetic = $("phonetic");
+  const exampleWrap = $("example-wrap");
+  const exampleText = $("example-text");
+  const btnSpeak = $("speak");
+  const btnStart = $("start");
+  const elStartLabel = $("start-label");
+  const btnKnown = $("known");
+  const btnUnknown = $("unknown");
+  const btnMistake = $("mistake");
+  const btnNext = $("next");
+  const errBanner = $("err-banner");
+  const errText = $("err-text");
+  const similarWordsPanel = $("similarWordsPanel");
+  const similarPlaceholder = $("similar-placeholder");
+  const btnLoadSimilar = $("btnLoadSimilar");
+  const similarWordsStatus = $("similarWordsStatus");
+  const similarWordsList = $("similarWordsList");
+  const sidebarWordbook = $("sidebar-wordbook");
+  const wordbookHint = $("wordbook-hint");
+
+  let cachedSettings = {
+    daily_words: 50,
+    review_ratio: "1:1",
+    similar_words_auto_load: false,
+    wordbook_id: "cet6",
+    wordbook_label: "大学英语六级 (CET-6)",
+  };
+  let similarLoadedForWord = null;
+
+  (function setToday() {
+    const d = new Date();
+    $("today-date").textContent =
+      d.getFullYear() + "年" + String(d.getMonth() + 1).padStart(2, "0") + "月" + String(d.getDate()).padStart(2, "0") + "日";
+  })();
+
+  async function apiGet(path) {
+    const res = await fetch(path);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+  async function apiPost(path, body) {
+    const res = await fetch(path, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(body || {}),
+    });
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+    return data;
+  }
+
+  function parseMeta(meta) {
+    const stats = { total: 0, active: 0, known: 0, fuzzy: 0, unknown: 0, reviews: 0 };
+    if (!meta) return stats;
+    const re = /(今日词库|待巩固|已记住|记忆模糊|不认识|已抽查)\s+(\d+)/g;
+    const map = {
+      今日词库: "total", 待巩固: "active", 已记住: "known",
+      记忆模糊: "fuzzy", 不认识: "unknown", 已抽查: "reviews",
+    };
+    let m;
+    while ((m = re.exec(meta))) stats[map[m[1]]] = parseInt(m[2], 10);
+    return stats;
+  }
+
+  function showError(msg) {
+    errBanner.hidden = false;
+    errText.textContent = msg;
+  }
+  function clearError() {
+    errBanner.hidden = true;
+  }
+
+  function resetSimilarPanel() {
+    similarWordsStatus.textContent = "";
+    similarWordsList.innerHTML = "";
+  }
+
+  async function loadSimilarForWord(word) {
+    const w = (word || "").trim();
+    if (!w) return;
+    similarWordsStatus.textContent = "加载中…";
+    similarWordsList.innerHTML = "";
+    btnLoadSimilar.disabled = true;
+    try {
+      const data = await apiGet("/api/similar-for?word=" + encodeURIComponent(w));
+      const items = Array.isArray(data.items) ? data.items : [];
+      if (data.index_miss) {
+        similarWordsStatus.textContent = "当前词不在形近词索引中。";
+        return;
+      }
+      if (!items.length) {
+        similarWordsStatus.textContent = "暂无形近词。";
+        return;
+      }
+      similarWordsStatus.textContent = data.truncated ? "共 " + items.length + " 个（截断）" : "共 " + items.length + " 个";
+      items.forEach((row) => {
+        const li = document.createElement("li");
+        const sp = document.createElement("span");
+        sp.className = "font-semibold text-blue-600";
+        sp.textContent = row.word || "";
+        li.appendChild(sp);
+        li.appendChild(document.createTextNode(" — "));
+        li.appendChild(document.createTextNode(row.meaning != null ? String(row.meaning) : ""));
+        similarWordsList.appendChild(li);
+      });
+    } catch (e) {
+      similarWordsStatus.textContent = "加载失败：" + (e.message || e);
+    } finally {
+      btnLoadSimilar.disabled = false;
+    }
+  }
+
+  function expectedReviewTarget(newWords, ratio) {
+    const parts = String(ratio || "1:1").split(":");
+    const a = parseInt(parts[0], 10) || 1;
+    const b = parseInt(parts[1], 10) || 1;
+    return Math.max(0, Math.round(newWords * b / a));
+  }
+
+  function applyGoalFromSettings() {
+    const n = Math.max(1, parseInt(String(cachedSettings.daily_words || 50), 10) || 50);
+    $("goal-total").textContent = String(n);
+    $("goal-total2").textContent = String(n);
+    $("stat-total").textContent = String(n);
+    if (sidebarWordbook && cachedSettings.wordbook_id) {
+      sidebarWordbook.value = String(cachedSettings.wordbook_id);
+    }
+  }
+
+  function fillWordbookOptions(items) {
+    if (!sidebarWordbook) return;
+    sidebarWordbook.innerHTML = "";
+    (items || []).forEach((it) => {
+      const opt = document.createElement("option");
+      opt.value = String(it.id || "");
+      opt.textContent = String(it.label || it.id) + (it.available ? "" : "（即将推出）");
+      opt.disabled = !it.available;
+      sidebarWordbook.appendChild(opt);
+    });
+    if (cachedSettings.wordbook_id) {
+      sidebarWordbook.value = String(cachedSettings.wordbook_id);
+    }
+  }
+
+  function render(state) {
+    clearError();
+    if (!state) return;
+    elWord.textContent = state.word || "";
+    elMeaning.textContent = state.meaning || "";
+    elMeta.textContent = state.meta || "";
+
+    const wp = state.wordProgress || {};
+    if (elWordProgress && wp.reinforce && (state.phase === "question" || state.phase === "meaning")) {
+      const required = Number(wp.required) || 3;
+      const streak = Number(wp.streak) || 0;
+      let hint = "";
+      if (state.phase === "meaning" && (state.ui || {}).showMistake) {
+        const remain = Math.max(0, required - streak);
+        hint = remain <= 1
+          ? "点「下一个」且未点「记错了」即可完成今日学习"
+          : "巩固中：还需记得 " + remain + " 次（勿点记错了）";
+      } else if (streak > 0) {
+        hint = "巩固进度 " + streak + "/" + required;
+      } else {
+        hint = "该词需巩固 " + required + " 次后计入今日完成";
+      }
+      elWordProgress.textContent = hint;
+      elWordProgress.classList.remove("hidden");
+    } else if (elWordProgress) {
+      elWordProgress.textContent = "";
+      elWordProgress.classList.add("hidden");
+    }
+
+    const prog = state.progress || {};
+    const newT = prog.new_target > 0 ? prog.new_target : Math.max(1, parseInt(String(cachedSettings.daily_words || 50), 10) || 50);
+    const revT = prog.review_target > 0 ? prog.review_target : expectedReviewTarget(newT, cachedSettings.review_ratio);
+    if (progReviewDone) progReviewDone.textContent = String(prog.review_completed ?? 0);
+    if (progReviewTotal) progReviewTotal.textContent = String(prog.review_target ?? revT);
+    if (progNewDone) progNewDone.textContent = String(prog.new_completed ?? 0);
+    if (progNewTotal) progNewTotal.textContent = String(prog.new_target ?? newT);
+
+    const ph = (state.phonetic != null ? String(state.phonetic) : "").trim();
+    const showPh = !!ph && (state.phase === "question" || state.phase === "meaning");
+    elPhonetic.textContent = ph;
+    elPhonetic.classList.toggle("hidden", !showPh);
+
+    const ex = (state.examplePhrase != null ? String(state.examplePhrase) : "").trim();
+    const showEx = state.phase === "meaning" && !!ex;
+    exampleWrap.classList.toggle("hidden", !showEx);
+    exampleText.textContent = ex;
+
+    if (sidebarWordbook && cachedSettings.wordbook_id) {
+      const v = String(cachedSettings.wordbook_id);
+      if (sidebarWordbook.querySelector('option[value="' + v + '"]')) {
+        sidebarWordbook.value = v;
+      }
+    }
+
+    const ui = state.ui || {};
+    const inMeaning = state.phase === "meaning" && ui.showNext;
+
+    btnStart.hidden = !ui.startEnabled;
+    btnStart.disabled = !ui.startEnabled;
+    if (elStartLabel) {
+      elStartLabel.textContent = ui.startLabel || (state.progress && state.progress.resumable ? "继续学习" : "开始学习");
+    }
+    btnKnown.hidden = !ui.knownEnabled;
+    btnKnown.disabled = !ui.knownEnabled;
+    btnUnknown.hidden = !ui.unknownEnabled;
+    btnUnknown.disabled = !ui.unknownEnabled;
+    btnMistake.hidden = !ui.showMistake;
+    btnMistake.disabled = !ui.showMistake;
+    btnNext.hidden = !ui.showNext;
+    btnNext.disabled = !ui.showNext;
+    btnSpeak.hidden = !inMeaning;
+    btnSpeak.disabled = !inMeaning;
+
+    if (inMeaning) {
+      similarWordsPanel.classList.remove("hidden");
+      similarPlaceholder.classList.add("hidden");
+      const w = elWord.textContent.trim();
+      if (w && w !== similarLoadedForWord) {
+        similarLoadedForWord = w;
+        resetSimilarPanel();
+        if (cachedSettings.similar_words_auto_load) {
+          loadSimilarForWord(w);
+        } else {
+          similarWordsStatus.textContent = "点击「显示形近词」按需加载。";
+        }
+      }
+    } else {
+      similarWordsPanel.classList.add("hidden");
+      similarPlaceholder.classList.remove("hidden");
+      similarLoadedForWord = null;
+    }
+
+    const goalTarget = prog.target > 0 ? prog.target : (newT + revT);
+    const goalDone = typeof prog.completed === "number" ? prog.completed : 0;
+    $("goal-total").textContent = String(goalTarget);
+    $("goal-total2").textContent = String(goalTarget);
+    $("goal-done").textContent = String(goalDone);
+    $("goal-bar").style.width = goalTarget > 0 ? Math.round((goalDone / goalTarget) * 100) + "%" : "0%";
+    $("stat-total").textContent = String(goalTarget);
+
+    const s = parseMeta(state.meta);
+    if (state.phase === "question" || state.phase === "meaning") {
+      $("stat-known").textContent = String(goalDone);
+      $("stat-fuzzy").textContent = String(s.fuzzy);
+      $("stat-unknown").textContent = String(s.unknown);
+    } else if (state.phase === "idle" || state.phase === "finished") {
+      $("stat-known").textContent = String(goalDone);
+      $("stat-fuzzy").textContent = String(s.fuzzy || 0);
+      $("stat-unknown").textContent = String(s.unknown || 0);
+    }
+  }
+
+  btnStart.addEventListener("click", async () => {
+    try {
+      const s = await apiGet("/api/settings");
+      cachedSettings = s;
+      render(await apiPost("/api/start", { count: s.daily_words }));
+    } catch (e) {
+      showError(e.message);
+    }
+  });
+  btnKnown.addEventListener("click", async () => {
+    try { render(await apiPost("/api/known")); } catch (e) { showError(e.message); }
+  });
+  btnUnknown.addEventListener("click", async () => {
+    try { render(await apiPost("/api/unknown")); } catch (e) { showError(e.message); }
+  });
+  btnMistake.addEventListener("click", async () => {
+    try { render(await apiPost("/api/mistake")); } catch (e) { showError(e.message); }
+  });
+  btnNext.addEventListener("click", async () => {
+    try { render(await apiPost("/api/next")); } catch (e) { showError(e.message); }
+  });
+
+  let currentAudioUrl = null;
+  btnSpeak.addEventListener("click", async () => {
+    const text = (elWord.textContent || "").trim();
+    if (!text) return;
+    btnSpeak.disabled = true;
+    try {
+      const res = await fetch("/api/tts?text=" + encodeURIComponent(text), { method: "GET" });
+      if (!res.ok) {
+        const data = await res.json().catch(() => ({}));
+        throw new Error(data.error || `HTTP ${res.status}`);
+      }
+      const blob = await res.blob();
+      if (currentAudioUrl) URL.revokeObjectURL(currentAudioUrl);
+      currentAudioUrl = URL.createObjectURL(blob);
+      await new Audio(currentAudioUrl).play();
+    } catch (e) {
+      showError("发音失败：" + e.message + "（请到「API 接入配置」填写讯飞密钥）");
+    } finally {
+      btnSpeak.disabled = btnSpeak.hidden;
+    }
+  });
+
+  btnLoadSimilar.addEventListener("click", () => loadSimilarForWord(elWord.textContent.trim()));
+
+  if (sidebarWordbook) {
+    sidebarWordbook.addEventListener("change", async () => {
+      const wid = sidebarWordbook.value;
+      if (!wid || wid === String(cachedSettings.wordbook_id || "")) return;
+      wordbookHint.classList.remove("hidden");
+      try {
+        cachedSettings = await apiPost("/api/settings", {
+          daily_words: cachedSettings.daily_words,
+          review_ratio: cachedSettings.review_ratio,
+          similar_words_auto_load: !!cachedSettings.similar_words_auto_load,
+          wordbook_id: wid,
+        });
+        applyGoalFromSettings();
+        render(await apiGet("/api/state"));
+      } catch (e) {
+        showError(e.message);
+      }
+      setTimeout(() => {
+        wordbookHint.classList.add("hidden");
+      }, 4500);
+    });
+  }
+
+  window.addEventListener("beforeunload", () => {
+    fetch("/api/session/save", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+      keepalive: true,
+    }).catch(() => {});
+  });
+
+  (async function init() {
+    try {
+      const wbList = await apiGet("/api/wordbooks");
+      fillWordbookOptions(wbList.items || []);
+      cachedSettings = await apiGet("/api/settings");
+      applyGoalFromSettings();
+      render(await apiGet("/api/state"));
+    } catch (e) {
+      showError(e.message);
+    }
+  })();
+
+  if (window.echarts) {
+    const dom = document.getElementById("waveform-chart");
+    if (dom) {
+      const chart = echarts.init(dom);
+      const gen = () => Array.from({ length: 40 }, () => Math.random() * 10 + 2);
+      chart.setOption({
+        grid: { top: 0, bottom: 0, left: 0, right: 0 },
+        xAxis: { type: "category", show: false },
+        yAxis: { type: "value", show: false, max: 20 },
+        series: [{
+          data: gen(),
+          type: "bar",
+          barWidth: "60%",
+          itemStyle: {
+            color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
+              { offset: 0, color: "#3B82F6" },
+              { offset: 1, color: "#1D4ED8" },
+            ]),
+            borderRadius: [4, 4, 0, 0],
+          },
+        }],
+      });
+      setInterval(() => chart.setOption({ series: [{ data: gen() }] }), 400);
+      window.addEventListener("resize", () => chart.resize());
+    }
+  }
+</script>
+</body>
+</html>

@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>用户学习设置 · 单词学习</title>
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.3.4.3.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.1.0.7.js"></script>
+<style>body { background: #F4F4F4; font-family: system-ui, sans-serif; }</style>
+</head>
+<body class="min-h-screen p-8">
+  <div class="max-w-lg mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+    <h1 class="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+      <iconify-icon icon="ph:gear-six-bold" class="text-blue-600"></iconify-icon>
+      用户学习设置
+    </h1>
+    <p class="text-sm text-gray-500 mb-6">对接 <code class="bg-gray-100 px-1 rounded">GET/POST /api/settings</code>、<code class="bg-gray-100 px-1 rounded">GET /api/wordbooks</code></p>
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="wordbook">单词书</label>
+        <select id="wordbook" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm"></select>
+        <p class="text-xs text-gray-400 mt-1">将词库 JSON 放入 <code class="bg-gray-100 px-1 rounded">Vocabulary_model/Word_data</code> 并命名为目录中约定文件名后，对应选项会自动变为可选。</p>
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="dailyWords">每天学习单词数</label>
+        <input id="dailyWords" type="number" min="1" max="500" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="reviewRatio">新学习 : 复习 比例</label>
+        <select id="reviewRatio" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm">
+          <option value="1:1">1 : 1</option>
+          <option value="1:2">1 : 2</option>
+          <option value="1:3">1 : 3</option>
+          <option value="1:4">1 : 4</option>
+        </select>
+      </div>
+      <label class="flex items-start gap-2 text-sm text-gray-700 cursor-pointer">
+        <input id="similarWordsAutoLoad" type="checkbox" class="mt-1" />
+        <span>释义页自动加载形近词</span>
+      </label>
+    </div>
+    <div class="flex gap-3 mt-8">
+      <button type="button" id="saveBtn" class="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">保存</button>
+      <a href="/app/pages/api-config.html" class="px-5 py-2.5 rounded-lg border border-gray-300 text-sm inline-flex items-center gap-1 hover:bg-gray-50">
+        <iconify-icon icon="ph:plugs-connected-bold"></iconify-icon> API 接入配置
+      </a>
+      <a href="/app/index.html" class="px-5 py-2.5 rounded-lg border border-gray-300 text-sm inline-flex items-center gap-1 hover:bg-gray-50">
+        <iconify-icon icon="ph:arrow-left-bold"></iconify-icon> 返回单词背诵
+      </a>
+    </div>
+    <p id="msg" class="text-sm mt-4 text-gray-600"></p>
+  </div>
+  <script>
+    async function apiGet(path) {
+      const res = await fetch(path);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+    async function apiPost(path, body) {
+      const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+    (async function () {
+      try {
+        const wb = await apiGet("/api/wordbooks");
+        const sel = document.getElementById("wordbook");
+        sel.innerHTML = "";
+        (wb.items || []).forEach((it) => {
+          const opt = document.createElement("option");
+          opt.value = String(it.id || "");
+          opt.textContent = String(it.label || it.id) + (it.available ? "" : "（即将推出）");
+          opt.disabled = !it.available;
+          sel.appendChild(opt);
+        });
+        const s = await apiGet("/api/settings");
+        document.getElementById("dailyWords").value = String(s.daily_words);
+        document.getElementById("reviewRatio").value = s.review_ratio;
+        document.getElementById("similarWordsAutoLoad").checked = !!s.similar_words_auto_load;
+        if (s.wordbook_id) sel.value = String(s.wordbook_id);
+      } catch (e) {
+        document.getElementById("msg").textContent = "加载失败：" + e.message;
+      }
+    })();
+    document.getElementById("saveBtn").addEventListener("click", async () => {
+      const msg = document.getElementById("msg");
+      const n = Number(document.getElementById("dailyWords").value);
+      if (!Number.isFinite(n) || n < 1 || n > 500) {
+        msg.textContent = "请输入 1–500 的整数。";
+        return;
+      }
+      try {
+        await apiPost("/api/settings", {
+          wordbook_id: document.getElementById("wordbook").value,
+          daily_words: Math.floor(n),
+          review_ratio: document.getElementById("reviewRatio").value,
+          similar_words_auto_load: document.getElementById("similarWordsAutoLoad").checked,
+        });
+        msg.textContent = "已保存。";
+      } catch (e) {
+        msg.textContent = "保存失败：" + e.message;
+      }
+    });
+  </script>
+</body>
+</html>

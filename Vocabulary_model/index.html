@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>里程碑1 · 背单词</title>
+  <title>单词学习</title>
   <style>
     :root {
       color-scheme: light dark;
@@ -37,18 +37,22 @@
       max-width: 42rem;
       margin: 0 auto;
     }
-    h1 {
-      font-size: 1.1rem;
-      font-weight: 600;
-      color: var(--muted);
-      margin: 0 0 1rem;
-    }
     .card {
       background: var(--card);
       border: 1px solid var(--border);
       border-radius: 12px;
       padding: 1.25rem 1.5rem;
       box-shadow: 0 2px 12px rgba(0,0,0,.06);
+    }
+    .hidden { display: none; }
+    .title {
+      margin: 0 0 1rem;
+      font-size: 1.2rem;
+      color: var(--muted);
+    }
+    .desc {
+      margin: 0 0 1rem;
+      color: var(--muted);
     }
     .word {
       font-size: 1.75rem;
@@ -74,13 +78,7 @@
       cursor: pointer;
       flex: 0 0 auto;
     }
-    .speak:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
-    }
-    .speak[hidden] {
-      display: none;
-    }
+    .speak[hidden] { display: none; }
     .meta {
       font-size: 0.85rem;
       color: var(--muted);
@@ -102,6 +100,17 @@
       flex-wrap: wrap;
       justify-content: center;
     }
+    .field { margin: 0.9rem 0; }
+    label { display: block; margin-bottom: 0.35rem; font-weight: 600; }
+    input, select {
+      width: 100%;
+      padding: 0.55rem 0.65rem;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+      font: inherit;
+      background: #fff;
+      color: #111;
+    }
     button {
       font: inherit;
       cursor: pointer;
@@ -115,48 +124,186 @@
       min-width: 9.5rem;
       text-align: center;
     }
-    button:disabled {
-      opacity: 0.5;
-      cursor: not-allowed;
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    button.secondary { background: transparent; color: var(--text); }
+    .err { color: #b42318; font-size: 0.9rem; margin-top: 0.75rem; }
+    .hint { font-size: 0.85rem; color: var(--muted); margin-top: 0.75rem; line-height: 1.4; }
+    .statsGrid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(9rem, 1fr));
+      gap: 0.6rem;
+      margin: 0.8rem 0 1rem;
     }
-    button.secondary {
-      background: transparent;
-      color: var(--text);
-    }
-    .err {
-      color: #b42318;
+    .statsItem {
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 0.6rem;
       font-size: 0.9rem;
-      margin-top: 0.75rem;
     }
-    .hint {
-      font-size: 0.8rem;
-      color: var(--muted);
+    .statsWords {
+      margin: 0;
+      padding-left: 1.1rem;
+      max-height: 16rem;
+      overflow: auto;
+      line-height: 1.45;
+    }
+    .similarWords {
       margin-top: 1rem;
-      line-height: 1.4;
+      padding-top: 1rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.92rem;
+    }
+    .similarWordsToolbar {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+      margin-bottom: 0.6rem;
+    }
+    .similarWordsToolbar button.secondary {
+      margin: 0;
+    }
+    .similarWordsStatus {
+      color: var(--muted);
+      font-size: 0.85rem;
+    }
+    .similarWordsList {
+      margin: 0;
+      padding-left: 1.15rem;
+      line-height: 1.5;
+    }
+    .similarWordsList li {
+      margin: 0.35rem 0;
+    }
+    .similarWordsList .nw {
+      font-weight: 600;
+      color: var(--accent);
+    }
+    .field label.checkboxLabel {
+      font-weight: 500;
+      display: flex;
+      align-items: flex-start;
+      gap: 0.5rem;
+    }
+    .field label.checkboxLabel input {
+      width: auto;
+      margin-top: 0.2rem;
     }
   </style>
 </head>
 <body>
   <div class="wrap">
-    <div class="card">
+    <section class="card" id="homeView">
+      <h1 class="title">单词学习首页</h1>
+      <p class="desc">先进入学习设置，或直接开始本次学习。</p>
+      <div class="actions">
+        <button type="button" id="goStudyBtn">开始学习</button>
+        <button type="button" class="secondary" id="goSettingsBtn">用户学习设置</button>
+        <button type="button" class="secondary" id="goStatsBtn">学习统计</button>
+      </div>
+      <p class="hint" id="homeSettingsHint"></p>
+    </section>
+
+    <section class="card hidden" id="settingsView">
+      <h1 class="title">用户学习设置</h1>
+      <div class="field">
+        <label for="dailyWords">每天学习单词数</label>
+        <input id="dailyWords" type="number" min="1" max="500" step="1" />
+      </div>
+      <div class="field">
+        <label for="reviewRatio">新学习 : 复习 比例</label>
+        <select id="reviewRatio">
+          <option value="1:1">1 : 1</option>
+          <option value="1:2">1 : 2</option>
+          <option value="1:3">1 : 3</option>
+          <option value="1:4">1 : 4</option>
+        </select>
+      </div>
+      <div class="field">
+        <label class="checkboxLabel" for="similarWordsAutoLoad">
+          <input id="similarWordsAutoLoad" type="checkbox" />
+          释义页自动加载形近词（按需请求；仍可手动点击加载）
+        </label>
+      </div>
+      <div class="actions">
+        <button type="button" id="saveSettingsBtn">保存设置</button>
+        <button type="button" class="secondary" id="backHomeBtn">返回首页</button>
+      </div>
+      <p class="hint" id="settingsMsg"></p>
+    </section>
+
+    <section class="card hidden" id="statsView">
+      <h1 class="title">学习统计</h1>
+      <div class="statsGrid">
+        <div class="statsItem">已学习总词数：<span id="statsTotal">0</span></div>
+        <div class="statsItem">熟练：<span id="statsProficient">0</span></div>
+        <div class="statsItem">模糊：<span id="statsFuzzy">0</span></div>
+        <div class="statsItem">不熟练：<span id="statsUnfamiliar">0</span></div>
+        <div class="statsItem">未分类：<span id="statsUnclassified">0</span></div>
+      </div>
+      <p class="desc">最近学习过的单词（按最近学习时间倒序）：</p>
+      <ol class="statsWords" id="statsWordsList"></ol>
+      <p class="hint" id="statsHint"></p>
+      <div class="actions">
+        <button type="button" class="secondary" id="refreshStatsBtn">刷新统计</button>
+        <button type="button" class="secondary" id="statsBackHomeBtn">返回首页</button>
+      </div>
+    </section>
+
+    <section class="card hidden" id="studyView">
       <div class="word">
         <span id="word">点击“开始学习”</span>
         <button type="button" class="speak" id="speak" hidden disabled title="播放英文发音">🔊</button>
       </div>
       <div class="meta" id="meta"></div>
       <div class="meaning" id="meaning">中文释义会在你作答后显示。</div>
+      <div class="similarWords hidden" id="similarWordsPanel">
+        <div class="similarWordsToolbar">
+          <button type="button" class="secondary" id="btnLoadSimilar">显示形近词</button>
+          <span class="similarWordsStatus" id="similarWordsStatus"></span>
+        </div>
+        <ul class="similarWordsList" id="similarWordsList"></ul>
+      </div>
       <div class="actions">
         <button type="button" id="start" disabled>开始学习</button>
         <button type="button" class="primaryAction" id="known" disabled>我认识</button>
         <button type="button" class="secondary primaryAction" id="unknown" disabled>我不认识</button>
         <button type="button" class="secondary" id="mistakeAfterKnown" disabled hidden>记错了</button>
         <button type="button" id="nextAfterMeaning" disabled hidden>下一个</button>
+        <button type="button" class="secondary" id="backToHomeBtn">返回首页</button>
       </div>
       <p class="err" id="err" hidden></p>
       <p class="hint" id="hint"></p>
-    </div>
+    </section>
   </div>
   <script>
+    const homeView = document.getElementById("homeView");
+    const settingsView = document.getElementById("settingsView");
+    const statsView = document.getElementById("statsView");
+    const studyView = document.getElementById("studyView");
+
+    const homeSettingsHint = document.getElementById("homeSettingsHint");
+    const settingsMsg = document.getElementById("settingsMsg");
+    const dailyWordsInput = document.getElementById("dailyWords");
+    const reviewRatioSelect = document.getElementById("reviewRatio");
+
+    const goStudyBtn = document.getElementById("goStudyBtn");
+    const goSettingsBtn = document.getElementById("goSettingsBtn");
+    const goStatsBtn = document.getElementById("goStatsBtn");
+    const saveSettingsBtn = document.getElementById("saveSettingsBtn");
+    const backHomeBtn = document.getElementById("backHomeBtn");
+    const backToHomeBtn = document.getElementById("backToHomeBtn");
+    const refreshStatsBtn = document.getElementById("refreshStatsBtn");
+    const statsBackHomeBtn = document.getElementById("statsBackHomeBtn");
+
+    const statsTotal = document.getElementById("statsTotal");
+    const statsProficient = document.getElementById("statsProficient");
+    const statsFuzzy = document.getElementById("statsFuzzy");
+    const statsUnfamiliar = document.getElementById("statsUnfamiliar");
+    const statsUnclassified = document.getElementById("statsUnclassified");
+    const statsWordsList = document.getElementById("statsWordsList");
+    const statsHint = document.getElementById("statsHint");
+
     const elWord = document.getElementById("word");
     const btnSpeak = document.getElementById("speak");
     const elMeta = document.getElementById("meta");
@@ -168,6 +315,143 @@
     const btnUnknown = document.getElementById("unknown");
     const btnMistakeAfterKnown = document.getElementById("mistakeAfterKnown");
     const btnNextAfterMeaning = document.getElementById("nextAfterMeaning");
+
+    const similarWordsPanel = document.getElementById("similarWordsPanel");
+    const btnLoadSimilar = document.getElementById("btnLoadSimilar");
+    const similarWordsStatus = document.getElementById("similarWordsStatus");
+    const similarWordsList = document.getElementById("similarWordsList");
+    const similarWordsAutoLoad = document.getElementById("similarWordsAutoLoad");
+
+    let cachedSettings = {
+      daily_words: 50,
+      review_ratio: "1:1",
+      similar_words_auto_load: false,
+    };
+    let similarLoadedForWord = null;
+
+    async function refreshCachedSettings() {
+      cachedSettings = await apiGet("/api/settings");
+    }
+
+    function resetSimilarPanel() {
+      similarWordsStatus.textContent = "";
+      similarWordsList.innerHTML = "";
+    }
+
+    async function loadSimilarForWord(word) {
+      const w = (word || "").trim();
+      if (!w) return;
+      similarWordsStatus.textContent = "加载中…";
+      similarWordsList.innerHTML = "";
+      btnLoadSimilar.disabled = true;
+      try {
+        const data = await apiGet(`/api/similar-for?word=${encodeURIComponent(w)}`);
+        const items = Array.isArray(data.items) ? data.items : [];
+        if (data.index_miss) {
+          similarWordsStatus.textContent = "当前词不在形近词索引中。";
+          return;
+        }
+        if (!items.length) {
+          similarWordsStatus.textContent = "暂无形近词。";
+          return;
+        }
+        similarWordsStatus.textContent = data.truncated
+          ? `共 ${items.length} 个（索引中还有更多，仅显示前若干条）`
+          : `共 ${items.length} 个`;
+        items.forEach((row) => {
+          const li = document.createElement("li");
+          const spanWord = document.createElement("span");
+          spanWord.className = "nw";
+          spanWord.textContent = row.word || "";
+          li.appendChild(spanWord);
+          li.appendChild(document.createTextNode(" — "));
+          li.appendChild(
+            document.createTextNode(row.meaning != null ? String(row.meaning) : "")
+          );
+          similarWordsList.appendChild(li);
+        });
+      } catch (e) {
+        similarWordsStatus.textContent =
+          "加载失败：" + (e instanceof Error ? e.message : String(e));
+      } finally {
+        btnLoadSimilar.disabled = false;
+      }
+    }
+
+    function switchView(mode) {
+      homeView.classList.toggle("hidden", mode !== "home");
+      settingsView.classList.toggle("hidden", mode !== "settings");
+      statsView.classList.toggle("hidden", mode !== "stats");
+      studyView.classList.toggle("hidden", mode !== "study");
+    }
+
+    async function apiGet(path) {
+      const res = await fetch(path, { method: "GET" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data && data.error ? data.error : `HTTP ${res.status}`);
+      return data;
+    }
+
+    async function apiPost(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data && data.error ? data.error : `HTTP ${res.status}`);
+      return data;
+    }
+
+    async function loadSettingsForHome() {
+      const s = await apiGet("/api/settings");
+      cachedSettings = s;
+      const auto = s.similar_words_auto_load ? "开启" : "关闭";
+      homeSettingsHint.textContent =
+        `当前设置：每日 ${s.daily_words} 词；新学习:复习 = ${s.review_ratio}；释义页自动加载形近词：${auto}`;
+      return s;
+    }
+
+    async function showSettingsView() {
+      settingsMsg.textContent = "";
+      const s = await apiGet("/api/settings");
+      cachedSettings = s;
+      dailyWordsInput.value = String(s.daily_words);
+      reviewRatioSelect.value = s.review_ratio;
+      similarWordsAutoLoad.checked = !!s.similar_words_auto_load;
+      switchView("settings");
+    }
+
+    function renderStats(data) {
+      statsTotal.textContent = String(data.total_learned || 0);
+      statsProficient.textContent = String(data.proficient_count || 0);
+      statsFuzzy.textContent = String(data.fuzzy_count || 0);
+      statsUnfamiliar.textContent = String(data.unfamiliar_count || 0);
+      statsUnclassified.textContent = String(data.unclassified_count || 0);
+
+      const words = Array.isArray(data.words) ? data.words : [];
+      statsWordsList.innerHTML = "";
+      if (!words.length) {
+        const li = document.createElement("li");
+        li.textContent = "暂无已学习单词记录。";
+        statsWordsList.appendChild(li);
+        return;
+      }
+      words.forEach((item) => {
+        const li = document.createElement("li");
+        const word = item && item.word ? String(item.word) : "";
+        const prof = item && item.proficiency ? String(item.proficiency) : "unclassified";
+        li.textContent = `${word} (${prof})`;
+        statsWordsList.appendChild(li);
+      });
+    }
+
+    async function showStatsView() {
+      statsHint.textContent = "";
+      const data = await apiGet("/api/learning-stats?limit=300");
+      renderStats(data);
+      switchView("stats");
+    }
 
     function showError(msg) {
       elErr.hidden = false;
@@ -182,9 +466,13 @@
       btnMistakeAfterKnown.disabled = true;
       btnNextAfterMeaning.hidden = true;
       btnNextAfterMeaning.disabled = true;
+      similarWordsPanel.classList.add("hidden");
+      resetSimilarPanel();
+      similarLoadedForWord = null;
+      btnLoadSimilar.disabled = false;
     }
 
-    function render(state) {
+    function renderStudyState(state) {
       elErr.hidden = true;
       elHint.textContent = "";
 
@@ -196,15 +484,11 @@
       btnStart.disabled = !ui.startEnabled;
       btnKnown.disabled = !ui.knownEnabled;
       btnUnknown.disabled = !ui.unknownEnabled;
-      // 学习开始后隐藏“开始学习”，本轮完成后再显示
       btnStart.hidden = !ui.startEnabled;
 
-      // 仅在“展示词义”阶段显示喇叭与后续操作
       const inMeaningPhase = state && state.phase === "meaning" && !!ui.showNext;
       btnKnown.hidden = inMeaningPhase;
       btnUnknown.hidden = inMeaningPhase;
-
-      // 只在展示词义时展示喇叭按钮（避免在“认识/不认识”判别阶段出现）
       btnSpeak.hidden = !inMeaningPhase;
       btnSpeak.disabled = !inMeaningPhase;
 
@@ -212,6 +496,23 @@
       btnMistakeAfterKnown.disabled = !ui.showMistake;
       btnNextAfterMeaning.hidden = !ui.showNext;
       btnNextAfterMeaning.disabled = !ui.showNext;
+
+      const w = elWord.textContent.trim();
+      if (inMeaningPhase) {
+        similarWordsPanel.classList.remove("hidden");
+        if (w !== similarLoadedForWord) {
+          similarLoadedForWord = w;
+          resetSimilarPanel();
+          if (cachedSettings.similar_words_auto_load) {
+            loadSimilarForWord(w);
+          } else {
+            similarWordsStatus.textContent = "点击「显示形近词」加载（不会在释义之前请求数据）。";
+          }
+        }
+      } else {
+        similarWordsPanel.classList.add("hidden");
+        similarLoadedForWord = null;
+      }
     }
 
     let currentAudioUrl = null;
@@ -237,78 +538,130 @@
       }
     }
 
-    async function apiGet(path) {
-      const res = await fetch(path, { method: "GET" });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data && data.error ? data.error : `HTTP ${res.status}`);
-      return data;
-    }
-
-    async function apiPost(path, body) {
-      const res = await fetch(path, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(body || {}),
-      });
-      const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data && data.error ? data.error : `HTTP ${res.status}`);
-      return data;
-    }
-
-    async function init() {
+    goStudyBtn.addEventListener("click", async () => {
+      switchView("study");
       try {
-        const state = await apiGet("/api/state");
-        render(state);
+        await refreshCachedSettings();
+        const settings = cachedSettings;
+        renderStudyState(await apiPost("/api/start", { count: settings.daily_words }));
       } catch (e) {
         showError(e instanceof Error ? e.message : String(e));
-        elHint.innerHTML =
-          "请在本目录运行 <code>python serve_milestone1.py</code>，浏览器打开提示的地址（不要直接用 file:// 打开本页）。";
       }
-    }
+    });
+
+    goSettingsBtn.addEventListener("click", async () => {
+      try {
+        await showSettingsView();
+      } catch (e) {
+        homeSettingsHint.textContent = `设置加载失败：${e instanceof Error ? e.message : String(e)}`;
+      }
+    });
+
+    goStatsBtn.addEventListener("click", async () => {
+      try {
+        await showStatsView();
+      } catch (e) {
+        homeSettingsHint.textContent = `统计加载失败：${e instanceof Error ? e.message : String(e)}`;
+      }
+    });
+
+    saveSettingsBtn.addEventListener("click", async () => {
+      const dailyWords = Number(dailyWordsInput.value);
+      const reviewRatio = reviewRatioSelect.value;
+      if (!Number.isFinite(dailyWords) || dailyWords < 1 || dailyWords > 500) {
+        settingsMsg.textContent = "请输入 1 到 500 之间的每日学习单词数。";
+        return;
+      }
+      try {
+        const saved = await apiPost("/api/settings", {
+          daily_words: Math.floor(dailyWords),
+          review_ratio: reviewRatio,
+          similar_words_auto_load: similarWordsAutoLoad.checked,
+        });
+        cachedSettings = saved;
+        settingsMsg.textContent = "设置已保存。";
+      } catch (e) {
+        settingsMsg.textContent = `保存失败：${e instanceof Error ? e.message : String(e)}`;
+      }
+    });
+
+    backHomeBtn.addEventListener("click", async () => {
+      switchView("home");
+      try {
+        await loadSettingsForHome();
+      } catch (e) {
+        homeSettingsHint.textContent = `设置加载失败：${e instanceof Error ? e.message : String(e)}`;
+      }
+    });
+
+    backToHomeBtn.addEventListener("click", async () => {
+      switchView("home");
+      try {
+        await loadSettingsForHome();
+      } catch (e) {
+        homeSettingsHint.textContent = `设置加载失败：${e instanceof Error ? e.message : String(e)}`;
+      }
+    });
+
+    refreshStatsBtn.addEventListener("click", async () => {
+      try {
+        const data = await apiGet("/api/learning-stats?limit=300");
+        renderStats(data);
+        statsHint.textContent = `已刷新（${new Date().toLocaleString()}）`;
+      } catch (e) {
+        statsHint.textContent = `刷新失败：${e instanceof Error ? e.message : String(e)}`;
+      }
+    });
+
+    statsBackHomeBtn.addEventListener("click", async () => {
+      switchView("home");
+      try {
+        await loadSettingsForHome();
+      } catch (e) {
+        homeSettingsHint.textContent = `设置加载失败：${e instanceof Error ? e.message : String(e)}`;
+      }
+    });
 
     btnStart.addEventListener("click", async () => {
       try {
-        render(await apiPost("/api/start", { count: 50 }));
+        await refreshCachedSettings();
+        const settings = cachedSettings;
+        renderStudyState(await apiPost("/api/start", { count: settings.daily_words }));
       } catch (e) {
         showError(e instanceof Error ? e.message : String(e));
       }
     });
-
     btnKnown.addEventListener("click", async () => {
-      try {
-        render(await apiPost("/api/known"));
-      } catch (e) {
-        showError(e instanceof Error ? e.message : String(e));
-      }
+      try { renderStudyState(await apiPost("/api/known")); }
+      catch (e) { showError(e instanceof Error ? e.message : String(e)); }
     });
-
     btnUnknown.addEventListener("click", async () => {
-      try {
-        render(await apiPost("/api/unknown"));
-      } catch (e) {
-        showError(e instanceof Error ? e.message : String(e));
-      }
+      try { renderStudyState(await apiPost("/api/unknown")); }
+      catch (e) { showError(e instanceof Error ? e.message : String(e)); }
     });
-
     btnMistakeAfterKnown.addEventListener("click", async () => {
-      try {
-        render(await apiPost("/api/mistake"));
-      } catch (e) {
-        showError(e instanceof Error ? e.message : String(e));
-      }
+      try { renderStudyState(await apiPost("/api/mistake")); }
+      catch (e) { showError(e instanceof Error ? e.message : String(e)); }
     });
-
     btnNextAfterMeaning.addEventListener("click", async () => {
-      try {
-        render(await apiPost("/api/next"));
-      } catch (e) {
-        showError(e instanceof Error ? e.message : String(e));
-      }
+      try { renderStudyState(await apiPost("/api/next")); }
+      catch (e) { showError(e instanceof Error ? e.message : String(e)); }
     });
-
     btnSpeak.addEventListener("click", speakCurrentWord);
 
-    init();
+    btnLoadSimilar.addEventListener("click", async () => {
+      const w = elWord.textContent.trim();
+      await loadSimilarForWord(w);
+    });
+
+    (async function init() {
+      switchView("home");
+      try {
+        await loadSettingsForHome();
+      } catch (e) {
+        homeSettingsHint.textContent = `设置加载失败：${e instanceof Error ? e.message : String(e)}`;
+      }
+    })();
   </script>
 </body>
 </html>

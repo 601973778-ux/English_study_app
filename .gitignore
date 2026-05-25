@@ -134,6 +134,17 @@ celerybeat.pid
 # SageMath parsed files
 *.sage.py
 
+# User learning data (local)
+Vocabulary_model/user_data/learned_words.json
+Vocabulary_model/user_data/learned_words.json.tmp
+Vocabulary_model/user_data/learned_words.json.*.tmp
+Vocabulary_model/user_data/daily_progress.json
+Vocabulary_model/user_data/daily_progress.json.tmp
+Vocabulary_model/user_data/daily_progress.json.*.tmp
+Vocabulary_model/user_data/xfyun_credentials.json
+Vocabulary_model/user_data/xfyun_credentials.json.*.tmp
+Vocabulary_model/review_reciting.db
+
 # Environments
 .env
 .envrc

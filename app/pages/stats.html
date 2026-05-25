@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>学习统计 · 单词学习</title>
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.3.4.3.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.1.0.7.js"></script>
+<style>body { background: #F4F4F4; font-family: system-ui, sans-serif; }</style>
+</head>
+<body class="min-h-screen p-8">
+  <div class="max-w-3xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+    <h1 class="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+      <iconify-icon icon="ph:chart-line-up-bold" class="text-blue-600"></iconify-icon>
+      学习统计
+    </h1>
+    <p class="text-sm text-gray-500 mb-6">对接 <code class="bg-gray-100 px-1 rounded">GET /api/learning-stats</code></p>
+    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6 text-sm">
+      <div class="bg-gray-50 rounded-lg p-3 border">已学习总词数：<span id="statsTotal" class="font-semibold">0</span></div>
+      <div class="bg-gray-50 rounded-lg p-3 border">熟练：<span id="statsProficient" class="font-semibold">0</span></div>
+      <div class="bg-gray-50 rounded-lg p-3 border">模糊：<span id="statsFuzzy" class="font-semibold">0</span></div>
+      <div class="bg-gray-50 rounded-lg p-3 border">不熟练：<span id="statsUnfamiliar" class="font-semibold">0</span></div>
+      <div class="bg-gray-50 rounded-lg p-3 border">未分类：<span id="statsUnclassified" class="font-semibold">0</span></div>
+    </div>
+    <p class="text-sm text-gray-600 mb-2">最近学习过的单词：</p>
+    <ol id="statsWordsList" class="text-sm pl-5 max-h-72 overflow-auto space-y-1 text-gray-800 border border-gray-100 rounded-lg p-4 bg-gray-50"></ol>
+    <p id="hint" class="text-xs text-gray-400 mt-4"></p>
+    <div class="flex gap-3 mt-6">
+      <button type="button" id="refresh" class="px-4 py-2 rounded-lg border border-gray-300 text-sm hover:bg-gray-50">刷新</button>
+      <a href="/app/index.html" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm inline-flex items-center gap-1 hover:bg-blue-500">
+        <iconify-icon icon="ph:arrow-left-bold"></iconify-icon> 返回单词背诵
+      </a>
+    </div>
+  </div>
+  <script>
+    async function apiGet(path) {
+      const res = await fetch(path);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+    function render(data) {
+      document.getElementById("statsTotal").textContent = String(data.total_learned || 0);
+      document.getElementById("statsProficient").textContent = String(data.proficient_count || 0);
+      document.getElementById("statsFuzzy").textContent = String(data.fuzzy_count || 0);
+      document.getElementById("statsUnfamiliar").textContent = String(data.unfamiliar_count || 0);
+      document.getElementById("statsUnclassified").textContent = String(data.unclassified_count || 0);
+      const list = document.getElementById("statsWordsList");
+      list.innerHTML = "";
+      const words = Array.isArray(data.words) ? data.words : [];
+      if (!words.length) {
+        const li = document.createElement("li");
+        li.textContent = "暂无记录。";
+        list.appendChild(li);
+        return;
+      }
+      words.forEach((item) => {
+        const li = document.createElement("li");
+        const w = item && item.word ? String(item.word) : "";
+        const p = item && item.proficiency ? String(item.proficiency) : "unclassified";
+        li.textContent = w + " (" + p + ")";
+        list.appendChild(li);
+      });
+    }
+    async function load() {
+      try {
+        render(await apiGet("/api/learning-stats?limit=300"));
+        document.getElementById("hint").textContent = "";
+      } catch (e) {
+        document.getElementById("hint").textContent = "加载失败：" + e.message;
+      }
+    }
+    document.getElementById("refresh").addEventListener("click", load);
+    load();
+  </script>
+</body>
+</html>

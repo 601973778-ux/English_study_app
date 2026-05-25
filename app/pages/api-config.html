@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>API 接入配置 · 单词学习</title>
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.3.4.3.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.1.0.7.js"></script>
+<style>body { background: #F4F4F4; font-family: system-ui, sans-serif; }</style>
+</head>
+<body class="min-h-screen p-8">
+  <div class="max-w-lg mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+    <h1 class="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+      <iconify-icon icon="ph:plugs-connected-bold" class="text-blue-600"></iconify-icon>
+      讯飞文字转语音 API
+    </h1>
+    <p class="text-sm text-gray-500 mb-4">
+      保存至本地 <code class="bg-gray-100 px-1 rounded text-xs">user_data/xfyun_credentials.json</code>（不入 Git）。
+      发音接口：<code class="bg-gray-100 px-1 rounded text-xs">GET /api/tts</code>
+    </p>
+    <p id="status" class="text-sm mb-6 px-3 py-2 rounded-lg bg-gray-50 text-gray-600">加载中…</p>
+
+    <div class="space-y-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="appid">APPID</label>
+        <input id="appid" type="text" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="讯飞控制台应用 APPID" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="apiKey">API Key</label>
+        <input id="apiKey" type="password" autocomplete="new-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="讯飞 API Key" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="apiSecret">API Secret</label>
+        <input id="apiSecret" type="password" autocomplete="new-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="讯飞 API Secret" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="vcn">发音人 vcn</label>
+        <input id="vcn" type="text" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="x4_xiaoyan（默认）" />
+        <p class="text-xs text-gray-400 mt-1">若报 <strong>11200 licc failed</strong>：不是密钥填错，而是该发音人未在控制台授权。请到「在线语音合成 → 发音人授权管理」添加 <code class="bg-gray-100 px-1 rounded">x4_xiaoyan</code> 或试用英文发音人后再填此处。</p>
+      </div>
+    </div>
+
+    <p class="text-xs text-gray-400 mt-4">
+      在
+      <a class="text-blue-600 hover:underline" href="https://console.xfyun.cn/services/tts" target="_blank" rel="noopener">讯飞开放平台 · 在线语音合成</a>
+      创建应用并开通 WebAPI；凭证仅保存在本机。
+    </p>
+
+    <div class="flex flex-wrap gap-3 mt-8">
+      <button type="button" id="saveBtn" class="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">保存配置</button>
+      <button type="button" id="testBtn" class="px-5 py-2.5 rounded-lg border border-blue-300 text-blue-700 text-sm font-semibold hover:bg-blue-50">测试发音</button>
+      <button type="button" id="clearBtn" class="px-5 py-2.5 rounded-lg border border-gray-300 text-gray-600 text-sm hover:bg-gray-50">清除本地配置</button>
+      <a href="/app/index.html" class="px-5 py-2.5 rounded-lg border border-gray-300 text-sm inline-flex items-center gap-1 hover:bg-gray-50">
+        <iconify-icon icon="ph:arrow-left-bold"></iconify-icon> 返回背诵
+      </a>
+    </div>
+    <p id="msg" class="text-sm mt-4 text-gray-600" role="status" aria-live="polite"></p>
+  </div>
+  <script>
+    async function apiGet(path) {
+      const res = await fetch(path);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      return data;
+    }
+    async function apiPost(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || ("HTTP " + res.status));
+      return data;
+    }
+
+    function renderStatus(cfg) {
+      const el = document.getElementById("status");
+      if (!cfg.configured) {
+        el.className = "text-sm mb-6 px-3 py-2 rounded-lg bg-amber-50 text-amber-800";
+        el.textContent = "尚未配置：填写并保存后可使用发音。";
+        return;
+      }
+      const src = cfg.source === "file" ? "本地文件" : (cfg.source === "env" ? "环境变量" : "未知");
+      let extra = "";
+      if (cfg.env_also_set && cfg.file_has_priority) {
+        extra = "（已同时设置环境变量，优先使用本地文件）";
+      } else if (cfg.source === "env") {
+        extra = "（当前由环境变量提供，保存后写入本地文件）";
+      }
+      el.className = "text-sm mb-6 px-3 py-2 rounded-lg bg-green-50 text-green-800";
+      el.textContent = "已配置 · 来源：" + src + extra + (cfg.api_key_masked ? " · Key：" + cfg.api_key_masked : "");
+    }
+
+    async function loadConfig() {
+      const cfg = await apiGet("/api/tts-config");
+      document.getElementById("appid").value = cfg.appid || "";
+      const keyInput = document.getElementById("apiKey");
+      const secretInput = document.getElementById("apiSecret");
+      keyInput.placeholder = cfg.has_api_key ? "已保存（留空不修改）" : "讯飞 API Key";
+      secretInput.placeholder = cfg.has_api_secret ? "已保存（留空不修改）" : "讯飞 API Secret";
+      const vcnInput = document.getElementById("vcn");
+      if (vcnInput) vcnInput.value = cfg.vcn || "x4_xiaoyan";
+      renderStatus(cfg);
+      return cfg;
+    }
+
+    loadConfig().catch((e) => {
+      document.getElementById("status").textContent = "加载失败：" + e.message;
+    });
+
+    document.getElementById("saveBtn").addEventListener("click", async () => {
+      const msg = document.getElementById("msg");
+      msg.textContent = "正在保存…";
+      const appid = document.getElementById("appid").value.trim();
+      const api_key = document.getElementById("apiKey").value.trim();
+      const api_secret = document.getElementById("apiSecret").value.trim();
+      if (!appid) {
+        msg.textContent = "请填写 APPID。";
+        return;
+      }
+      if (!api_key || !api_secret) {
+        const cur = await apiGet("/api/tts-config").catch(() => ({}));
+        if (!cur.has_api_key || !cur.has_api_secret) {
+          msg.textContent = "首次保存需填写完整的 API Key 与 API Secret。";
+          return;
+        }
+      }
+      try {
+        const vcn = (document.getElementById("vcn") || {}).value || "";
+        const cfg = await apiPost("/api/tts-config", { appid, api_key, api_secret, vcn: vcn.trim() });
+        document.getElementById("apiKey").value = "";
+        document.getElementById("apiSecret").value = "";
+        renderStatus(cfg);
+        msg.textContent = "已保存。";
+      } catch (e) {
+        msg.textContent = "保存失败：" + e.message;
+      }
+    });
+
+    document.getElementById("testBtn").addEventListener("click", async () => {
+      const msg = document.getElementById("msg");
+      msg.textContent = "正在合成…";
+      try {
+        const res = await fetch("/api/tts?text=" + encodeURIComponent("hello"), { method: "GET" });
+        if (!res.ok) {
+          const data = await res.json().catch(() => ({}));
+          throw new Error(data.error || ("HTTP " + res.status));
+        }
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        await new Audio(url).play();
+        URL.revokeObjectURL(url);
+        msg.textContent = "测试成功，已播放示例发音。";
+      } catch (e) {
+        msg.textContent = "测试失败：" + e.message;
+      }
+    });
+
+    document.getElementById("clearBtn").addEventListener("click", async () => {
+      if (!confirm("确定清除本机保存的讯飞凭证？（不影响环境变量）")) return;
+      const msg = document.getElementById("msg");
+      try {
+        const cfg = await apiPost("/api/tts-config", { clear: true });
+        document.getElementById("appid").value = "";
+        document.getElementById("apiKey").value = "";
+        document.getElementById("apiSecret").value = "";
+        renderStatus(cfg);
+        msg.textContent = "已清除本地配置。";
+      } catch (e) {
+        msg.textContent = "清除失败：" + e.message;
+      }
+    });
+  </script>
+</body>
+</html>

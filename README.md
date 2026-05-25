@@ -8,10 +8,18 @@
 
 ## 与现有资源的关系
 
+本项目的词表与词典类数据主要来自以下开源资源：
+
+### DictionaryByGPT4
+
 仓库内包含 [DictionaryByGPT4](https://github.com/ceelog/DictionaryByGPT4) 相关资源（见 `DictionaryByGPT4-main/`），提供：
 
 - 单词释义、例句、词根词缀等风格的结构化数据（如 `gptwords.json`）
 - 可参考的网页展示与离线词典形态
+
+### english-wordlists
+
+词书词表还来源于 [mahavivo/english-wordlists](https://github.com/mahavivo/english-wordlists)（见 `english-wordlists-master/`），提供 CET4/CET6、托福、GRE、COCA 词频等多套常用英语词汇表，用于选书、筛选与背诵词库构建。
 
 本应用将在此基础上扩展：**背诵流程**（列表、卡片、间隔复习）、**学习记录**，以及**可配置的智能体**（系统提示词、工具调用、多轮对话），而不是简单复刻静态词典页。
 
@@ -39,7 +47,10 @@
 
 ## 贡献与许可
 
-子项目 `DictionaryByGPT4-main` 遵循其自带的 `LICENSE` 与原作者说明。本仓库上层应用的许可与贡献方式待首次正式发布时补充。
+- 子项目 `DictionaryByGPT4-main` 遵循其自带的 `LICENSE` 与原作者说明。
+- 词表数据 `english-wordlists-master/` 来源于 [mahavivo/english-wordlists](https://github.com/mahavivo/english-wordlists)，使用时请遵循该仓库的许可与说明。
+
+本仓库上层应用的许可与贡献方式待首次正式发布时补充。
 
 ## 免责声明
 

@@ -1,0 +1,5 @@
+try{let e=typeof window<"u"?window:typeof global<"u"?global:typeof globalThis<"u"?globalThis:typeof self<"u"?self:{},d=new e.Error().stack;d&&(e._sentryDebugIds=e._sentryDebugIds||{},e._sentryDebugIds[d]="80b4ea21-83b5-4624-9085-fc9163d82109",e._sentryDebugIdIdentifier="sentry-dbid-80b4ea21-83b5-4624-9085-fc9163d82109")}catch(e){}{let e=typeof window<"u"?window:typeof global<"u"?global:typeof globalThis<"u"?globalThis:typeof self<"u"?self:{};e.SENTRY_RELEASE={id:"22.21.2"}}(self.webpackChunk_mb2024_mb_proto=self.webpackChunk_mb2024_mb_proto||[]).push([[9099],{9099:()=>{/*!
+   * Wait for document loaded before starting the execution
+   *//*! @license DOMPurify 3.3.1 | (c) Cure53 and other contributors | Released under the Apache license 2.0 and Mozilla Public License 2.0 | github.com/cure53/DOMPurify/blob/3.3.1/LICENSE *//*! Check if previously processed *//*! js-yaml 4.1.0 https://github.com/nodeca/js-yaml @license MIT */}}]);
+
+//# sourceMappingURL=9099-692e900f5bbc71e3ce70.js.map

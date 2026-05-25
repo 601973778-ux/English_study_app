@@ -43,29 +43,99 @@ def parse_args() -> argparse.Namespace:
 class Entry:
     word: str
     content: str
+    phonetic: str = ""
+    example_phrase: str = ""
+    display_meaning: str | None = None
+    gloss1: str = ""
+
+
+def _is_structured_wordbook_item(item: dict) -> bool:
+    return "词性1" in item or ("音标" in item and "释义1" in item)
+
+
+def _structured_item_to_entry(item: dict, word: str) -> Entry:
+    phonetic = str(item.get("音标", "")).strip()
+    example = str(item.get("示例&短句", item.get("示例与短句", ""))).strip()
+    lines: list[str] = []
+    for i in range(1, 48):
+        pos = item.get(f"词性{i}")
+        gloss = item.get(f"释义{i}")
+        if pos is None and gloss is None:
+            if i == 1:
+                continue
+            break
+        ps = str(pos or "").strip()
+        gs = str(gloss or "").strip()
+        if ps or gs:
+            if ps and gs:
+                lines.append(f"{ps} {gs}")
+            elif gs:
+                lines.append(gs)
+            elif ps:
+                lines.append(ps)
+    display = "\n".join(lines).strip()
+    if not display:
+        display = str(item.get("content", "")).strip() or "（暂无释义）"
+    gloss1 = str(item.get("释义1", "")).strip()
+    content_parts = [display]
+    if example:
+        content_parts.append(example)
+    content = "\n".join(content_parts)
+    return Entry(
+        word=word,
+        content=content,
+        phonetic=phonetic,
+        example_phrase=example,
+        display_meaning=display,
+        gloss1=gloss1,
+    )
+
+
+def _item_to_entry(item: dict) -> Entry | None:
+    word = str(item.get("word", "")).strip() or str(item.get("words", "")).strip()
+    if not word:
+        return None
+    if _is_structured_wordbook_item(item):
+        return _structured_item_to_entry(item, word)
+    content = str(item.get("content", "")).strip()
+    return Entry(word=word, content=content)
 
 
 def load_words(path: Path) -> list[Entry]:
     if not path.exists():
         raise FileNotFoundError(f"找不到词库文件: {path}")
 
+    raw_text = path.read_text(encoding="utf-8").strip()
     words: list[Entry] = []
-    with path.open("r", encoding="utf-8") as f:
-        for line_no, raw in enumerate(f, start=1):
-            line = raw.strip()
-            if not line:
-                continue
-            try:
-                item = json.loads(line)
-            except json.JSONDecodeError:
-                # 遇到坏行时跳过，避免单条数据影响整体学习
-                continue
 
-            # 兼容不同字段名：word / words
-            word = str(item.get("word", "")).strip() or str(item.get("words", "")).strip()
-            content = str(item.get("content", "")).strip()
-            if word:
-                words.append(Entry(word=word, content=content))
+    if path.suffix.lower() == ".json" and raw_text.startswith("["):
+        try:
+            arr = json.loads(raw_text)
+        except json.JSONDecodeError as e:
+            raise ValueError(f"JSON 解析失败: {path}") from e
+        if not isinstance(arr, list):
+            raise ValueError(f"JSON 根类型应为数组: {path}")
+        for item in arr:
+            if not isinstance(item, dict):
+                continue
+            ent = _item_to_entry(item)
+            if ent is not None:
+                words.append(ent)
+    else:
+        with path.open("r", encoding="utf-8") as f:
+            for raw in f:
+                line = raw.strip()
+                if not line:
+                    continue
+                try:
+                    item = json.loads(line)
+                except json.JSONDecodeError:
+                    continue
+                if not isinstance(item, dict):
+                    continue
+                ent = _item_to_entry(item)
+                if ent is not None:
+                    words.append(ent)
 
     if not words:
         raise ValueError(f"词库为空或格式不正确: {path}")
@@ -149,6 +219,7 @@ def extract_meaning_only(content: str) -> str:
 
 
 ReviewMode = Literal["", "known", "unknown"]
+REINFORCE_STREAK_REQUIRED = 3
 
 
 class StudySession:
@@ -165,16 +236,145 @@ class StudySession:
             random.seed(seed)
 
         actual_count = min(count, len(entries))
-        self.daily_pool: list[Entry] = random.sample(entries, actual_count)
-        self.active_pool: list[Entry] = list(self.daily_pool)
+        planned = random.sample(entries, actual_count)
+        self._init_pools(planned, planned, set())
+
+    def _init_pools(
+        self,
+        daily_pool: list[Entry],
+        active_pool: list[Entry],
+        completed_words: set[str],
+    ) -> None:
+        self.daily_pool: list[Entry] = list(daily_pool)
+        self.active_pool: list[Entry] = list(active_pool)
+        self.completed_words: set[str] = set(completed_words)
         self.current: Entry | None = None
         self.review_count = 0
         self.review_mode: ReviewMode = ""
         self.waiting_next_after_meaning = False
-
         self.remembered_words: set[str] = set()
         self.fuzzy_words: set[str] = set()
         self.unknown_words: set[str] = set()
+        self.sequential_order = False
+        self.review_word_set: set[str] = set()
+        self.word_streaks: dict[str, int] = {}
+        self.word_reinforce: set[str] = set()
+
+    @classmethod
+    def from_daily_state(
+        cls,
+        entries: list[Entry],
+        *,
+        planned_words: list[str],
+        completed_words: set[str],
+        review_words: list[str] | None = None,
+        snapshot: dict | None = None,
+    ) -> StudySession:
+        by_word = {e.word: e for e in entries}
+        daily_pool = [by_word[w] for w in planned_words if w in by_word]
+        active_set = {w for w in planned_words if w not in completed_words}
+        active_pool = [by_word[w] for w in planned_words if w in active_set and w in by_word]
+
+        session = cls.__new__(cls)
+        session._init_pools(daily_pool, active_pool, completed_words)
+        session.sequential_order = True
+        session.review_word_set = {str(w).strip() for w in (review_words or []) if str(w).strip()}
+
+        if snapshot:
+            session.review_count = int(snapshot.get("review_count", 0))
+            session.review_mode = snapshot.get("review_mode") or ""
+            if session.review_mode not in ("", "known", "unknown"):
+                session.review_mode = ""
+            session.waiting_next_after_meaning = bool(
+                snapshot.get("waiting_next_after_meaning", False)
+            )
+            session.remembered_words = set(snapshot.get("remembered_words") or [])
+            session.fuzzy_words = set(snapshot.get("fuzzy_words") or [])
+            session.unknown_words = set(snapshot.get("unknown_words") or [])
+            raw_streaks = snapshot.get("word_streaks") or {}
+            if isinstance(raw_streaks, dict):
+                session.word_streaks = {
+                    str(k): int(v)
+                    for k, v in raw_streaks.items()
+                    if str(k).strip()
+                }
+            session.word_reinforce = {
+                str(w).strip()
+                for w in (snapshot.get("word_reinforce") or [])
+                if str(w).strip()
+            }
+            saved_active = snapshot.get("active_words") or []
+            if isinstance(saved_active, list) and saved_active:
+                by_w = {e.word: e for e in session.active_pool}
+                ordered = [by_w[w] for w in saved_active if w in by_w]
+                tail = [e for e in session.active_pool if e.word not in {x.word for x in ordered}]
+                session.active_pool = ordered + tail
+            cur = str(snapshot.get("current_word") or "").strip()
+            session.current = by_word.get(cur) if cur else None
+            if session.current and session.current.word not in active_set:
+                session.current = None
+        return session
+
+    def to_snapshot(self) -> dict:
+        return {
+            "current_word": self.current.word if self.current else "",
+            "review_count": self.review_count,
+            "review_mode": self.review_mode,
+            "waiting_next_after_meaning": self.waiting_next_after_meaning,
+            "remembered_words": sorted(self.remembered_words),
+            "fuzzy_words": sorted(self.fuzzy_words),
+            "unknown_words": sorted(self.unknown_words),
+            "active_words": [e.word for e in self.active_pool],
+            "word_streaks": dict(self.word_streaks),
+            "word_reinforce": sorted(self.word_reinforce),
+        }
+
+    def _word_progress_payload(self, word: str) -> dict[str, int | bool]:
+        reinforce = word in self.word_reinforce
+        required = REINFORCE_STREAK_REQUIRED if reinforce else 1
+        streak = int(self.word_streaks.get(word, 0))
+        return {
+            "reinforce": reinforce,
+            "streak": streak,
+            "required": required,
+        }
+
+    def _mark_reinforce(self, word: str) -> None:
+        clean = str(word).strip()
+        if not clean:
+            return
+        self.word_reinforce.add(clean)
+        self.word_streaks[clean] = 0
+
+    def _requeue_to_end(self, word: str) -> None:
+        clean = str(word).strip()
+        if not clean:
+            return
+        entry = next((e for e in self.active_pool if e.word == clean), None)
+        if entry is None:
+            return
+        rest = [e for e in self.active_pool if e.word != clean]
+        self.active_pool = rest + [entry]
+
+    def _graduate_word(self, word: str) -> None:
+        clean = str(word).strip()
+        if not clean:
+            return
+        self.remembered_words.add(clean)
+        self.fuzzy_words.discard(clean)
+        self.unknown_words.discard(clean)
+        self.completed_words.add(clean)
+        self.active_pool = [e for e in self.active_pool if e.word != clean]
+        self.word_streaks.pop(clean, None)
+        self.word_reinforce.discard(clean)
+
+    def _will_graduate_on_known_next(self, word: str) -> bool:
+        clean = str(word).strip()
+        if not clean:
+            return False
+        if clean not in self.word_reinforce:
+            return True
+        return self.word_streaks.get(clean, 0) + 1 >= REINFORCE_STREAK_REQUIRED
 
     def _meta_text(self) -> str:
         return (
@@ -187,6 +387,18 @@ class StudySession:
         if not self.active_pool:
             return None
         if len(self.active_pool) == 1:
+            return self.active_pool[0]
+        if self.sequential_order:
+            cur = self.current.word if self.current else ""
+            passed_current = not cur
+            for entry in self.active_pool:
+                if passed_current:
+                    return entry
+                if entry.word == cur:
+                    passed_current = True
+            for entry in self.active_pool:
+                if entry.word != cur:
+                    return entry
             return self.active_pool[0]
         candidates = [e for e in self.active_pool if e.word != (self.current.word if self.current else "")]
         bucket = candidates if candidates else self.active_pool
@@ -208,11 +420,14 @@ class StudySession:
         if not self.active_pool:
             return {
                 "phase": "finished",
-                "word": "本次学习完成",
-                "meaning": "你可以点击“开始学习”开启下一轮 50 词。",
+                "word": "今日学习任务已完成",
+                "meaning": "今日计划内的单词已全部学完，明天将开启新计划。",
                 "meta": self._meta_text(),
+                "phonetic": "",
+                "examplePhrase": "",
                 "ui": {
                     "startEnabled": True,
+                    "startLabel": "返回",
                     "knownEnabled": False,
                     "unknownEnabled": False,
                     "showMistake": False,
@@ -225,14 +440,27 @@ class StudySession:
             if not self.current:
                 return self.state()
 
+        phonetic = (self.current.phonetic or "").strip() if self.current else ""
+        example_phrase = (self.current.example_phrase or "").strip() if self.current else ""
+
+        word_progress = self._word_progress_payload(self.current.word)
+
         if self.waiting_next_after_meaning:
+            if self.current.display_meaning is not None:
+                meaning_text = self.current.display_meaning.strip() or "（暂无释义）"
+            else:
+                meaning_text = f"词义：{extract_meaning_only(self.current.content)}"
             return {
                 "phase": "meaning",
                 "word": self.current.word,
-                "meaning": f"词义：{extract_meaning_only(self.current.content)}",
+                "meaning": meaning_text,
                 "meta": self._meta_text(),
+                "phonetic": phonetic,
+                "examplePhrase": example_phrase,
+                "wordProgress": word_progress,
                 "ui": {
                     "startEnabled": False,
+                    "startLabel": "开始学习",
                     "knownEnabled": False,
                     "unknownEnabled": False,
                     "showMistake": self.review_mode == "known",
@@ -245,8 +473,12 @@ class StudySession:
             "word": self.current.word,
             "meaning": "请先判断是否认识，点击后会显示词义。",
             "meta": self._meta_text(),
+            "phonetic": phonetic,
+            "examplePhrase": "",
+            "wordProgress": word_progress,
             "ui": {
                 "startEnabled": False,
+                "startLabel": "开始学习",
                 "knownEnabled": True,
                 "unknownEnabled": True,
                 "showMistake": False,
@@ -274,22 +506,48 @@ class StudySession:
     def mistake_after_known(self) -> dict:
         if not self.current or not self.waiting_next_after_meaning or self.review_mode != "known":
             return self.state()
-        self.fuzzy_words.add(self.current.word)
-        self.remembered_words.discard(self.current.word)
-        self.unknown_words.discard(self.current.word)
+        word = self.current.word
+        self._mark_reinforce(word)
+        self.fuzzy_words.add(word)
+        self.remembered_words.discard(word)
+        self.unknown_words.discard(word)
+        self._requeue_to_end(word)
+        self.waiting_next_after_meaning = False
+        self.review_mode = ""
         self._show_current_word()
         return self.state()
 
     def next_after_meaning(self) -> dict:
         if not self.waiting_next_after_meaning:
             return self.state()
-        if self.review_mode == "known" and self.current:
-            self.remembered_words.add(self.current.word)
-            self.fuzzy_words.discard(self.current.word)
-            self.unknown_words.discard(self.current.word)
-            self.active_pool = [e for e in self.active_pool if e.word != self.current.word]
+        if self.current:
+            word = self.current.word
+            if self.review_mode == "known":
+                if word in self.word_reinforce:
+                    streak = self.word_streaks.get(word, 0) + 1
+                    self.word_streaks[word] = streak
+                    if streak >= REINFORCE_STREAK_REQUIRED:
+                        self._graduate_word(word)
+                    else:
+                        self._requeue_to_end(word)
+                else:
+                    self._graduate_word(word)
+            elif self.review_mode == "unknown":
+                self._mark_reinforce(word)
+                self._requeue_to_end(word)
         self._show_current_word()
         return self.state()
+
+    def peek_word_completed_on_next(self) -> str | None:
+        """若下一次 next 会算作「今日完成」，返回该词（调用 next 前使用）。"""
+        if (
+            self.waiting_next_after_meaning
+            and self.review_mode == "known"
+            and self.current
+            and self._will_graduate_on_known_next(self.current.word)
+        ):
+            return self.current.word
+        return None
 
 
 def run_session(words: list[Entry], count: int, seed: int | None) -> None:

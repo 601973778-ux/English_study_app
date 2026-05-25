@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<title>生词本 · 单词学习</title>
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.3.4.3.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.1.0.7.js"></script>
+<style>
+  body { background-color: #F4F4F4; font-family: 'Noto Sans SC', sans-serif; }
+</style>
+</head>
+<body class="min-h-screen flex items-center justify-center p-8">
+  <div class="max-w-md bg-white rounded-2xl p-10 shadow-sm border border-gray-200 text-center">
+    <div class="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
+      <iconify-icon class="text-4xl text-blue-600" icon="ph:bookmarks-bold"></iconify-icon>
+    </div>
+    <h1 class="text-2xl font-bold mb-2">生词本</h1>
+    <p class="text-sm text-gray-500 leading-relaxed mb-6">
+      待墨刀完成本模块设计稿后，把对应 HTML 替换到这里。<br>
+      文件路径：<code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/app/pages/wordbook.html</code>
+    </p>
+    <div class="text-left text-xs text-gray-400 bg-gray-50 rounded-lg p-3 mb-6 leading-relaxed">
+      <p class="font-semibold text-gray-500 mb-1">现有数据来源（已可用）：</p>
+      <ul class="list-disc list-inside space-y-0.5">
+        <li>本轮 <code>不认识</code>/<code>记忆模糊</code> 集合在 StudySession 中</li>
+      </ul>
+      <p class="font-semibold text-gray-500 mt-2 mb-1">规划接口（后端待实现）：</p>
+      <ul class="list-disc list-inside space-y-0.5">
+        <li><code>POST /api/wordbook/add</code> — 加入生词本</li>
+        <li><code>GET /api/wordbook/list</code> — 列出生词</li>
+        <li><code>DELETE /api/wordbook/{word}</code> — 移除</li>
+      </ul>
+    </div>
+    <a href="/app/index.html"
+       class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors">
+      <iconify-icon icon="ph:arrow-left-bold"></iconify-icon> 返回单词背诵
+    </a>
+  </div>
+</body>
+</html>

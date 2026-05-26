@@ -1,0 +1,28 @@
+{
+  "corpus_id": "spoken_corpus_v1",
+  "description": "生活英语情景口语 · Book1 + DeepSeek 餐厅场景补充",
+  "sources": [
+    {
+      "source_id": "book1",
+      "path": "Spoken_model/Communication_Data/Book1_p1_p370.md",
+      "parser": "book1_md",
+      "format": "markdown"
+    },
+    {
+      "source_id": "deepseek_restaurant",
+      "path": "Spoken_model/Communication_Data/deepseek_markdown_20260526_1b23a0.md",
+      "parser": "deepseek_scenario_md",
+      "format": "markdown",
+      "default_scenario_tags": ["restaurant", "ordering", "dining", "eating_out"]
+    }
+  ],
+  "retriever": {
+    "type": "tfidf",
+    "default_top_k": 5
+  },
+  "embedding_upgrade": {
+    "optional_package": "fastembed",
+    "recommended_model": "BAAI/bge-small-zh-v1.5",
+    "note": "当前默认 TF-IDF 无需联网；升级向量检索见 README"
+  }
+}

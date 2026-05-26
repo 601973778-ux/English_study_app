@@ -1,0 +1,7 @@
+[
+  {
+    "id": "off_topic",
+    "patterns": ["weather", "politics", "football score"],
+    "reply": "That's interesting! Shall we look at the menu or continue with your order?"
+  }
+]

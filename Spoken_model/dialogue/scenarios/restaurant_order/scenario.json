@@ -1,0 +1,12 @@
+{
+  "title_zh": "餐厅点餐",
+  "title_en": "Restaurant Ordering",
+  "opening_line": "Good evening! Welcome to our restaurant. Table for how many?",
+  "default_stage": "GREETING",
+  "cycle_size": 10,
+  "topic_keywords": [
+    "menu", "order", "table", "reservation", "bill", "check",
+    "steak", "salad", "soup", "dessert", "drink", "wine", "coffee",
+    "appetizer", "main", "course", "tip", "waiter", "waitress"
+  ]
+}

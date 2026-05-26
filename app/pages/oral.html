@@ -2,34 +2,134 @@
 <html lang="zh-CN">
 <head>
 <meta charset="UTF-8" />
-<title>口语发音训练 · 单词学习</title>
+<title>口语对话 · 餐厅点餐</title>
 <script src="https://modao.cc/agent-py/static/source/js/tailwindcss.3.4.3.js"></script>
 <script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.1.0.7.js"></script>
 <style>
   body { background-color: #F4F4F4; font-family: 'Noto Sans SC', sans-serif; }
 </style>
 </head>
-<body class="min-h-screen flex items-center justify-center p-8">
-  <div class="max-w-md bg-white rounded-2xl p-10 shadow-sm border border-gray-200 text-center">
-    <div class="w-16 h-16 rounded-full bg-blue-50 flex items-center justify-center mx-auto mb-4">
-      <iconify-icon class="text-4xl text-blue-600" icon="ph:microphone-stage-bold"></iconify-icon>
+<body class="min-h-screen p-6">
+  <div class="max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-4">
+      <a href="/app/index.html" class="text-sm text-blue-600 inline-flex items-center gap-1">
+        <iconify-icon icon="ph:arrow-left-bold"></iconify-icon> 返回
+      </a>
+      <span id="cycleBadge" class="text-xs text-gray-500"></span>
     </div>
-    <h1 class="text-2xl font-bold mb-2">口语发音训练</h1>
-    <p class="text-sm text-gray-500 leading-relaxed mb-6">
-      待墨刀完成本模块设计稿后，把对应 HTML 替换到这里。<br>
-      文件路径：<code class="bg-gray-100 px-1.5 py-0.5 rounded text-xs">/app/pages/oral.html</code>
-    </p>
-    <div class="text-left text-xs text-gray-400 bg-gray-50 rounded-lg p-3 mb-6 leading-relaxed">
-      <p class="font-semibold text-gray-500 mb-1">规划接口（后端待实现）：</p>
-      <ul class="list-disc list-inside space-y-0.5">
-        <li><code>POST /api/oral/record</code> — 上传录音</li>
-        <li><code>GET /api/oral/score</code> — 取发音评分</li>
-      </ul>
+    <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+      <div class="px-6 py-4 border-b bg-blue-50">
+        <h1 class="text-xl font-bold text-gray-800">餐厅点餐对话</h1>
+        <p class="text-sm text-gray-500 mt-1">文本输入联调；语音识别后续接入 ASR。</p>
+      </div>
+      <div id="log" class="p-4 h-80 overflow-y-auto space-y-3 bg-gray-50 text-sm"></div>
+      <div class="p-4 border-t flex gap-2">
+        <input id="input" type="text" placeholder="English only for now, e.g. Table for two"
+               class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
+        <button id="sendBtn" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg">发送</button>
+      </div>
+      <div id="evalPanel" class="hidden p-4 border-t bg-amber-50 text-sm">
+        <p class="font-semibold mb-2">本轮练习完成</p>
+        <pre id="evalText" class="text-xs whitespace-pre-wrap text-gray-700 mb-3"></pre>
+        <div class="flex gap-2">
+          <button id="continueBtn" class="px-3 py-1.5 bg-green-600 text-white rounded-lg text-xs">继续下一轮</button>
+          <button id="endBtn" class="px-3 py-1.5 bg-gray-500 text-white rounded-lg text-xs">结束</button>
+        </div>
+      </div>
     </div>
-    <a href="/app/index.html"
-       class="inline-flex items-center gap-2 px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg hover:bg-blue-700 transition-colors">
-      <iconify-icon icon="ph:arrow-left-bold"></iconify-icon> 返回单词背诵
-    </a>
   </div>
+<script>
+const logEl = document.getElementById('log');
+const inputEl = document.getElementById('input');
+const cycleBadge = document.getElementById('cycleBadge');
+const evalPanel = document.getElementById('evalPanel');
+const evalText = document.getElementById('evalText');
+let sessionId = null;
+
+function append(role, text, extra) {
+  const div = document.createElement('div');
+  div.className = role === 'waiter' ? 'text-left' : 'text-right';
+  div.innerHTML = `<span class="inline-block max-w-[85%] px-3 py-2 rounded-xl ${role === 'waiter' ? 'bg-white border' : 'bg-blue-600 text-white'}">${text}</span>` +
+    (extra ? `<div class="text-[10px] text-gray-400 mt-0.5">${extra}</div>` : '');
+  logEl.appendChild(div);
+  logEl.scrollTop = logEl.scrollHeight;
+}
+
+async function playTts(url) {
+  if (!url) return;
+  try {
+    const audio = new Audio(url);
+    await audio.play();
+  } catch (_) {}
+}
+
+async function api(path, opts) {
+  const res = await fetch(path, opts);
+  const data = await res.json();
+  if (!res.ok) throw new Error(data.error || res.statusText);
+  return data;
+}
+
+async function startSession() {
+  const data = await api('/api/dialogue/start', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ scenario_id: 'restaurant_order' })
+  });
+  sessionId = data.session_id;
+  append('waiter', data.opening_line);
+  playTts(data.tts_url);
+  updateBadge(0, data.cycle_size || 10, 1);
+}
+
+function updateBadge(count, size, cycle) {
+  cycleBadge.textContent = `第 ${cycle} 轮 · ${count}/${size}`;
+}
+
+async function sendTurn() {
+  const text = inputEl.value.trim();
+  if (!text || !sessionId) return;
+  inputEl.value = '';
+  append('user', text);
+  const data = await api('/api/dialogue/turn', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId, user_text: text })
+  });
+  append('waiter', data.waiter_reply, data.route);
+  playTts(data.tts_url);
+  updateBadge(data.user_count_in_cycle, 10, data.cycle_index);
+  if (data.cycle_evaluation_ready) {
+    const ev = await api('/api/dialogue/evaluation?session_id=' + encodeURIComponent(sessionId));
+    evalText.textContent = JSON.stringify(ev, null, 2);
+    evalPanel.classList.remove('hidden');
+  }
+}
+
+document.getElementById('sendBtn').addEventListener('click', sendTurn);
+inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') sendTurn(); });
+document.getElementById('continueBtn').addEventListener('click', async () => {
+  await api('/api/dialogue/continue', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId })
+  });
+  evalPanel.classList.add('hidden');
+  append('waiter', 'Great, let us continue. What would you like next?');
+  updateBadge(0, 10, (await api('/api/dialogue/session?session_id=' + encodeURIComponent(sessionId))).cycle_index);
+});
+document.getElementById('endBtn').addEventListener('click', async () => {
+  await api('/api/dialogue/end', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ session_id: sessionId })
+  });
+  evalPanel.classList.add('hidden');
+  append('waiter', 'Session ended. Thanks for practicing!');
+  sessionId = null;
+});
+
+startSession().catch(err => append('waiter', '启动失败: ' + err.message));
+</script>
 </body>
 </html>

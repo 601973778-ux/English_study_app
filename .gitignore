@@ -145,6 +145,14 @@ Vocabulary_model/user_data/xfyun_credentials.json
 Vocabulary_model/user_data/xfyun_credentials.json.*.tmp
 Vocabulary_model/review_reciting.db
 
+# Spoken RAG generated index (rebuildable; chunks.jsonl can be committed)
+Spoken_model/rag/index/
+
+# Spoken dialogue session files (local)
+Spoken_model/dialogue/user_data/sessions/
+Spoken_model/dialogue/user_data/sessions/*.json
+Spoken_model/dialogue/user_data/sessions/*.tmp
+
 # Environments
 .env
 .envrc

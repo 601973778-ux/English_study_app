@@ -1,0 +1,12 @@
+[
+  {
+    "id": "repeat",
+    "patterns": ["repeat", "say again", "pardon", "what did you say", "could you repeat"],
+    "reply": "Of course. How can I help you with your order?"
+  },
+  {
+    "id": "exit",
+    "patterns": ["bye", "goodbye", "exit", "quit", "stop"],
+    "reply": "Thank you for visiting. Have a wonderful day!"
+  }
+]

@@ -56,6 +56,8 @@ from Vocabulary_model.daily_session_service import (  # noqa: E402
     on_session_action,
     start_or_resume,
 )
+from Spoken_model.dialogue.contracts.types import TurnRequest  # noqa: E402
+from Spoken_model.dialogue.core.dialogue_service import get_dialogue_service  # noqa: E402
 
 DEFAULT_PORT = 8766
 
@@ -247,6 +249,41 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:  # noqa: BLE001
                 self._send_json({"error": str(e)}, status=500)
             return
+        if req_path.startswith("/api/dialogue/scenarios"):
+            try:
+                svc = get_dialogue_service()
+                self._send_json({"items": svc.scenarios()})
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"error": str(e)}, status=500)
+            return
+        if req_path.startswith("/api/dialogue/evaluation"):
+            try:
+                qs = parse_qs(req_query)
+                session_id = (qs.get("session_id", [""])[0] or "").strip()
+                if not session_id:
+                    self._send_json({"error": "missing session_id"}, status=400)
+                    return
+                svc = get_dialogue_service()
+                self._send_json(svc.evaluation(session_id))
+            except KeyError:
+                self._send_json({"error": "session not found"}, status=404)
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"error": str(e)}, status=500)
+            return
+        if req_path.startswith("/api/dialogue/session"):
+            try:
+                qs = parse_qs(req_query)
+                session_id = (qs.get("session_id", [""])[0] or "").strip()
+                if not session_id:
+                    self._send_json({"error": "missing session_id"}, status=400)
+                    return
+                svc = get_dialogue_service()
+                self._send_json(svc.session_state(session_id).to_dict())
+            except KeyError:
+                self._send_json({"error": "session not found"}, status=404)
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"error": str(e)}, status=500)
+            return
         return super().do_GET()
 
     def do_POST(self) -> None:
@@ -304,6 +341,40 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                         "wordbook_label": wordbook_label(str(settings.get("wordbook_id", "cet6"))),
                     }
                 )
+                return
+            if req_path == "/api/dialogue/start":
+                scenario_id = str(payload.get("scenario_id") or "restaurant_order").strip()
+                svc = get_dialogue_service()
+                self._send_json(svc.start(scenario_id))
+                return
+            if req_path == "/api/dialogue/turn":
+                session_id = str(payload.get("session_id") or "").strip()
+                if not session_id:
+                    self._send_json({"error": "missing session_id"}, status=400)
+                    return
+                req = TurnRequest(
+                    session_id=session_id,
+                    user_text=payload.get("user_text"),
+                    audio_b64=payload.get("audio_b64"),
+                )
+                svc = get_dialogue_service()
+                self._send_json(svc.turn(req).to_dict())
+                return
+            if req_path == "/api/dialogue/continue":
+                session_id = str(payload.get("session_id") or "").strip()
+                if not session_id:
+                    self._send_json({"error": "missing session_id"}, status=400)
+                    return
+                svc = get_dialogue_service()
+                self._send_json(svc.continue_session(session_id))
+                return
+            if req_path == "/api/dialogue/end":
+                session_id = str(payload.get("session_id") or "").strip()
+                if not session_id:
+                    self._send_json({"error": "missing session_id"}, status=400)
+                    return
+                svc = get_dialogue_service()
+                self._send_json(svc.end(session_id))
                 return
             if _SESSION is None:
                 self._send_json({"error": "session not started"}, status=400)

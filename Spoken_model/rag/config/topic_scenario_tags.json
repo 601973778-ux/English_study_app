@@ -1,0 +1,18 @@
+{
+  "21": ["restaurant", "ordering", "dining", "eating_out"],
+  "42": ["restaurant", "chinese_food", "takeout"],
+  "9099": ["restaurant", "ordering", "phrases"],
+  "9001": ["restaurant", "ordering", "dining", "reservation"],
+  "9002": ["restaurant", "ordering", "waiting"],
+  "9003": ["restaurant", "ordering", "allergy", "vegetarian"],
+  "9004": ["restaurant", "ordering", "complaint"],
+  "9005": ["restaurant", "ordering", "reservation", "phone"],
+  "9016": ["restaurant", "ordering", "complaint", "crisis"],
+  "9022": ["restaurant", "ordering", "business", "dining"],
+  "16": ["shopping"],
+  "11": ["housing", "renting"],
+  "56": ["study_abroad", "visa"],
+  "58": ["job", "interview"],
+  "19": ["bank"],
+  "20": ["post_office"]
+}

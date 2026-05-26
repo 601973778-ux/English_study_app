@@ -1,0 +1,5 @@
+{
+  "topic_id": 21,
+  "scenario_tags": ["restaurant", "ordering", "dining", "eating_out"],
+  "chunk_types": ["dialogue_turn", "useful_expression", "vocabulary"]
+}

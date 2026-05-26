@@ -1,0 +1,8 @@
+{
+  "items": [
+    {"id": "greeting", "label": "Greeting & seating", "keywords": ["table", "reservation", "welcome"]},
+    {"id": "menu", "label": "Menu & ordering", "keywords": ["menu", "order", "like to have", "special"]},
+    {"id": "preferences", "label": "Preferences & allergies", "keywords": ["allerg", "vegetarian", "medium", "rare"]},
+    {"id": "payment", "label": "Bill & payment", "keywords": ["bill", "check", "tip", "pay"]}
+  ]
+}

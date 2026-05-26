@@ -1,0 +1,34 @@
+[
+  {
+    "id": "party_size",
+    "patterns": ["table for", "party of", "one", "two", "three", "four", "five", "six"],
+    "reply": "Certainly. Right this way, please.",
+    "next_stage": "SEATING",
+    "extract_party_size": true
+  },
+  {
+    "id": "menu_request",
+    "patterns": ["menu", "see the menu", "what do you recommend", "specials"],
+    "reply": "Here is our menu. Today's special is grilled salmon with seasonal vegetables.",
+    "next_stage": "ORDERING"
+  },
+  {
+    "id": "order_food",
+    "patterns": ["i'd like", "i would like", "can i have", "i'll have", "order"],
+    "reply": "Great choice. Would you like anything to drink with that?",
+    "next_stage": "ORDERING",
+    "set_slots": {"ordered": true}
+  },
+  {
+    "id": "drink",
+    "patterns": ["water", "wine", "beer", "coffee", "juice", "drink"],
+    "reply": "I'll bring that right away. Anything else for you?",
+    "next_stage": "ORDERING"
+  },
+  {
+    "id": "bill",
+    "patterns": ["bill", "check", "pay"],
+    "reply": "Of course. I'll bring the check in a moment.",
+    "next_stage": "PAYMENT"
+  }
+]

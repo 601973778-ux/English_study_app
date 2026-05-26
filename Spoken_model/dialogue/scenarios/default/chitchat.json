@@ -1,0 +1,12 @@
+[
+  {
+    "id": "thanks",
+    "patterns": ["thank you", "thanks", "appreciate"],
+    "reply": "You're very welcome! Is there anything else I can get for you?"
+  },
+  {
+    "id": "hello",
+    "patterns": ["hello", "hi", "hey", "good morning", "good evening"],
+    "reply": "Hello! Welcome. Table for how many, or would you like to order to go?"
+  }
+]

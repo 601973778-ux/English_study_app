@@ -10,6 +10,7 @@ class RouteKind(str, Enum):
     SCRIPT_CHITCHAT = "script_chitchat"
     SCRIPT_TOPIC = "script_topic"
     RAG_LLM = "rag_llm"
+    QUICK_CHITCHAT = "quick_chitchat"
     REDIRECT = "redirect"
 
 

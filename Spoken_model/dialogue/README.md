@@ -1,15 +1,16 @@
 # Spoken dialogue module
 
-Modular spoken English practice: **script fast path** for chitchat/control/simple slots, **RAG + DeepSeek LLM** for open dialogue.
+Modular spoken English practice: **script fast path** (optional), **quick chitchat** for short greetings, **RAG + DeepSeek LLM** for open dialogue.
 
 ## Layout
 
 ```
 Spoken_model/dialogue/
-  config/          # llm_defaults.json
+  config/          # llm_defaults.json, dialogue_flags.json
+  data/            # quick_chitchat.json (fast hello/thanks replies)
   contracts/       # types + adapter/scenario protocols
   core/            # pipeline, session store, registry, DialogueService
-  engines/         # ScriptEngine, RagLlmEngine
+  engines/         # ScriptEngine, QuickChitchatEngine, RagLlmEngine
   adapters/        # ASR/TTS/LLM/RAG wrappers
   evaluation/      # cycle rule evaluator
   scenarios/       # JSON scenario packs (default + restaurant_order)
@@ -18,12 +19,23 @@ Spoken_model/dialogue/
 
 ## Turn pipeline
 
+**Default (script frozen)** — see `config/dialogue_flags.json` (`script_engine_frozen: true`):
+
 ```
-user text → normalize → classify route
-  → script engine (control/chitchat/topic/redirect)
+user text → normalize
+  → quick chitchat patterns (hello/thanks/bye from data/quick_chitchat.json)
   → else RAG retrieve → DeepSeek chat (or template if LLM off)
   → update session / stage → TTS URL → cycle counter (10 turns)
 ```
+
+**Legacy (script enabled)** — set `script_engine_frozen: false` or `DIALOGUE_SCRIPT_FROZEN=0`:
+
+```
+user text → classify route → script engine (control/chitchat/topic/redirect)
+  → else RAG + LLM as above
+```
+
+Script engine code remains in the repo; when frozen it is not called.
 
 ## DeepSeek LLM 配置
 

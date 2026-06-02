@@ -108,6 +108,44 @@ def pick_distractor_entries(
     return picked[:need]
 
 
+def build_word_mcq(
+    target: Entry,
+    entries: list[Entry],
+    *,
+    wordbook_id: str,
+    variant: int,
+) -> dict[str, Any]:
+    """阶段 3：给释义，四选一英文单词。"""
+    meaning = _meaning_text(target)
+    distractors = pick_distractor_entries(
+        target,
+        entries,
+        wordbook_id=wordbook_id,
+        variant=variant + 1000,
+        need=3,
+    )
+    options_meta = [{"word": target.word, "text": target.word, "is_correct": True}]
+    for d in distractors:
+        options_meta.append(
+            {"word": d.word, "text": d.word, "is_correct": False}
+        )
+
+    rng = random.Random(f"word-mcq-shuffle:{target.word}:{variant}")
+    rng.shuffle(options_meta)
+
+    options = [m["text"] for m in options_meta]
+    correct_index = next(i for i, m in enumerate(options_meta) if m["is_correct"])
+
+    return {
+        "type": "word_mcq",
+        "prompt": f"释义「{meaning}」对应的单词是？",
+        "word": target.word,
+        "options": options,
+        "correct_index": correct_index,
+        "options_meta": options_meta,
+    }
+
+
 def build_mcq(
     target: Entry,
     entries: list[Entry],

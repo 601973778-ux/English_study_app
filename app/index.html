@@ -72,6 +72,10 @@
       <iconify-icon class="text-xl" icon="ph:book-open-bold"></iconify-icon>
       <span class="font-medium">单词背诵</span>
     </a>
+    <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#5C5C5C] hover:bg-gray-50 transition-all" href="/app/pages/placement.html">
+      <iconify-icon class="text-xl" icon="ph:exam-bold"></iconify-icon>
+      <span class="font-medium">词汇水平评估</span>
+    </a>
     <a class="flex items-center gap-3 px-4 py-3 rounded-lg text-[#5C5C5C] hover:bg-gray-50 transition-all" href="/app/pages/oral.html">
       <iconify-icon class="text-xl" icon="ph:microphone-stage-bold"></iconify-icon>
       <span class="font-medium">口语发音训练</span>
@@ -445,8 +449,10 @@
     resetQuizPanel();
     if (!quiz) return;
     quizPrompt.textContent = quiz.prompt || "";
-    if (quiz.type === "mcq" && Array.isArray(quiz.options)) {
-      quizHeading.textContent = "巩固测验 · 四选一";
+    if (quiz.type === "mcq" || quiz.type === "word_mcq") {
+      quizHeading.textContent = quiz.type === "word_mcq"
+        ? "巩固测验 · 选词四选一"
+        : "巩固测验 · 释义四选一";
       quizMcq.classList.remove("hidden");
       quiz.options.forEach((opt, idx) => {
         const btn = document.createElement("button");
@@ -670,11 +676,11 @@
       const label = wp.stage_label || "";
       let hint = "巩固 " + stage + "/" + required + "：" + label;
       if (state.phase === "meaning" && (state.ui || {}).showMistake) {
-        hint += " · 点「下一个」进入四选一；点「记错了」回到自评";
+        hint += " · 点「下一个」进入释义四选一，之后随机再测；勿点「记错了」";
       } else if (inQuiz) {
         hint += state.quizStage === 3
-          ? " · 填对即可完成今日学习"
-          : " · 选对进入例句填空；错选会换题并说明混淆原因";
+          ? " · 选对即可完成今日学习；错选会换题并说明混淆原因"
+          : " · 选对后随机出现第三次测验；错选会换题并说明混淆原因";
       } else if (stage === 1) {
         hint += " · 该词需完成三阶巩固后计入今日完成";
       }

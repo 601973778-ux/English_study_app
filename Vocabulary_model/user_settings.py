@@ -57,12 +57,16 @@ def _normalize_settings(raw: Any) -> dict[str, Any]:
 
     wordbook_id = normalize_wordbook_id(str(wordbook_raw))
 
-    return {
+    out = {
         "daily_words": daily_words,
         "review_ratio": review_ratio,
         "similar_words_auto_load": similar_words_auto_load,
         "wordbook_id": wordbook_id,
     }
+    for key in ("placement_band", "placement_label", "placement_percent", "placement_at"):
+        if key in raw and raw[key] not in (None, ""):
+            out[key] = raw[key]
+    return out
 
 
 def load_user_settings() -> dict[str, Any]:

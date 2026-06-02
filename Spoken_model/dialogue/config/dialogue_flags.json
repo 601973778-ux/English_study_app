@@ -1,0 +1,4 @@
+{
+  "script_engine_frozen": true,
+  "_comment": "When true, turns use quick_chitchat + rag_llm only. Script engine code stays in repo but is not invoked. Override with env DIALOGUE_SCRIPT_FROZEN=0|1."
+}

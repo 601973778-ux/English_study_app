@@ -1,0 +1,1434 @@
+{
+  "version": 1,
+  "description": "词汇水平快测抽样词库：四级→六级→专业四级→专业八级，难度递增",
+  "per_band": 50,
+  "total": 200,
+  "bands": [
+    {
+      "band": "cet4",
+      "source": "四级",
+      "level": 1,
+      "count": 50
+    },
+    {
+      "band": "cet6",
+      "source": "六级",
+      "level": 2,
+      "count": 50
+    },
+    {
+      "band": "tem4",
+      "source": "专业四级",
+      "level": 3,
+      "count": 50
+    },
+    {
+      "band": "tem8",
+      "source": "专业八级",
+      "level": 4,
+      "count": 50
+    }
+  ],
+  "items": [
+    {
+      "word": "job",
+      "meaning": "职业,工作；零活",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "appear",
+      "meaning": "出现；来到；似乎",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "slam",
+      "meaning": "使劲关，砰地放下",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "panel",
+      "meaning": "专门小组；面，板",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "photograph",
+      "meaning": "照/相片",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "contain",
+      "meaning": "包含，容纳,等于",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "duck",
+      "meaning": "鸭，雌鸭；鸭肉",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "shortly",
+      "meaning": "立刻,简短地",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "necessity",
+      "meaning": "必要性,必然性",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "act",
+      "meaning": "行动；见效",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "against",
+      "meaning": "倚在；逆，对着",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "robber",
+      "meaning": "强盗，盗贼",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "sweater",
+      "meaning": "厚运动衫，毛线衫",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "cushion",
+      "meaning": "垫子，坐垫，靠垫",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "playground",
+      "meaning": "操场，运动场",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "heat",
+      "meaning": "热，炎热,变热",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "dare",
+      "meaning": "敢,竟敢",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "married",
+      "meaning": "已婚的；婚姻的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "outdoor",
+      "meaning": "户外的，室外的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "tip",
+      "meaning": "轻击,给小费",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "nice",
+      "meaning": "美好的，令人愉快的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "much",
+      "meaning": "非常，许多的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "video",
+      "meaning": "电视的,电视",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "twin",
+      "meaning": "孪生的 n.孪生儿",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "main",
+      "meaning": "主要的，最重要的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "cart",
+      "meaning": "二轮运货马车",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "whenever",
+      "meaning": "无论何时，每当",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "noise",
+      "meaning": "喧闹声；响声；噪声",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "league",
+      "meaning": "同盟，联盟；联合会",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "damp",
+      "meaning": "潮湿的，有湿气的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "lick",
+      "meaning": "舔；舔吃",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "living-room",
+      "meaning": "起居室",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "shopping",
+      "meaning": "买东西，购物",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "immediate",
+      "meaning": "立即的,直接的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "along",
+      "meaning": "沿着,向前",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "motor",
+      "meaning": "发动机；机动车",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "egg",
+      "meaning": "蛋，鸡蛋，卵",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "frank",
+      "meaning": "坦白的，直率的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "amount",
+      "meaning": "总数；数量；和",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "taste",
+      "meaning": "尝；尝到",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "nation",
+      "meaning": "民族,国家",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "bike",
+      "meaning": "自行车,骑自行车",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "man",
+      "meaning": "男人；人；人类",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "gasoline",
+      "meaning": "(美)汽油",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "reality",
+      "meaning": "现实；真实",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "cabbage",
+      "meaning": "洋白菜，卷心菜",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "sole",
+      "meaning": "单独的，唯一的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "banana",
+      "meaning": "香蕉；芭蕉属植物",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "experimental",
+      "meaning": "实/试验的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "clumsy",
+      "meaning": "笨拙的；愚笨的",
+      "source": "四级",
+      "band": "cet4",
+      "level": 1
+    },
+    {
+      "word": "suite",
+      "meaning": "一套家具",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "adjacent",
+      "meaning": "邻近的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "infectious",
+      "meaning": "传染性的，有感染力的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "hose",
+      "meaning": "软管，水龙带",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "notable",
+      "meaning": "值得注意的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "champagne",
+      "meaning": "香槟酒",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "fulfill",
+      "meaning": "实行，完成",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "preach",
+      "meaning": "讲道，布道",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "spectrum",
+      "meaning": "光谱范围",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "ultraviolet",
+      "meaning": "紫外的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "successor",
+      "meaning": "继承人，继任者，接班人",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "intermittent",
+      "meaning": "断续的，间歇的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "batch",
+      "meaning": "一批，一组，一群",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "psychiatrist",
+      "meaning": "精神病医生，精神病学者",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "fossil",
+      "meaning": "化石",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "fantastic",
+      "meaning": "极好的，美妙的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "gorgeous",
+      "meaning": "异常漂亮的，壮丽的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "embed",
+      "meaning": "把…嵌入，埋入，埋置",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "hurricane",
+      "meaning": "飓风，旋风",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "incidentally",
+      "meaning": "顺便提一句",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "exemplify",
+      "meaning": "是…的榜样，举例说明",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "strand",
+      "meaning": "(绳索、缆线等的)一股，一缕",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "expertise",
+      "meaning": "专门技能(知识)",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "chant",
+      "meaning": "吟唱,吟唱的曲调",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "stimulus",
+      "meaning": "刺激(物)，激励",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "client",
+      "meaning": "委托人，(私人医生的)病人",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "tribute",
+      "meaning": "表示敬意或称赞的行动(言语或礼物)",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "embody",
+      "meaning": "体现，使具体化",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "depict",
+      "meaning": "(用图画、文字)表示，描述，描绘",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "alleviate",
+      "meaning": "缓和，减轻(痛苦等)",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "sheer",
+      "meaning": "纯粹的，全然的，地道的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "dentist",
+      "meaning": "牙科医生",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "rash",
+      "meaning": "鲁莽的，轻率的，匆忙的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "outbreak",
+      "meaning": "(指坏事)突然发生，爆发",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "array",
+      "meaning": "展示，陈列",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "biography",
+      "meaning": "传记",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "converge",
+      "meaning": "聚集，汇合",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "arena",
+      "meaning": "(古罗马圆形剧场中央的)竞技场地",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "slash",
+      "meaning": "挥砍，劈刺",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "intelligible",
+      "meaning": "可理解的，易于明白的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "dizzy",
+      "meaning": "头晕目眩的，头昏眼花的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "limp",
+      "meaning": "蹒跚;一瘸一拐地走",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "rig",
+      "meaning": "给(船)装配帆、索具等",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "fringe",
+      "meaning": "刘海，额前短发",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "ascend",
+      "meaning": "登高，上升，升高",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "proficiency",
+      "meaning": "精通，熟练",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "radical",
+      "meaning": "根本的，基本的",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "slaughter",
+      "meaning": "屠宰，屠杀",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "penguin",
+      "meaning": "企鹅",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "murmur",
+      "meaning": "沙沙声，潺潺声",
+      "source": "六级",
+      "band": "cet6",
+      "level": 2
+    },
+    {
+      "word": "vacancy",
+      "meaning": "空，未占用",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "escalator",
+      "meaning": "(BrE)自动楼梯",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "dung",
+      "meaning": "(动物的)粪",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "blessed",
+      "meaning": "神圣的，受上帝恩宠的 2. 带来愉快的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "dessert",
+      "meaning": "(饭后的)甜点，甜食",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "saleslady",
+      "meaning": "女店员，女售货员",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "browse",
+      "meaning": "浏览(书刊)",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "disbelief",
+      "meaning": "不相信，怀疑",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "bilingual",
+      "meaning": "熟悉两种语言的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "narration",
+      "meaning": "叙述，讲述",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "knight",
+      "meaning": "(欧洲中世纪时的)骑士",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "commandment",
+      "meaning": "戒律，圣诫",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "screenplay",
+      "meaning": "电影剧本，剧本",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "chatterbox",
+      "meaning": "喋喋不休的人，话匣子",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "uproar",
+      "meaning": "骚乱，骚动",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "inaction",
+      "meaning": "无行动，不活跃，懒散",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "brother-in-law",
+      "meaning": "姐夫，妹夫",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "gutter",
+      "meaning": "水槽，檐槽",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "fast-food",
+      "meaning": "专门提供快餐服务的，不精细的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "awe",
+      "meaning": "畏惧，害怕心情",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "surveillance",
+      "meaning": "(囚犯等的)看守",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "ellipse",
+      "meaning": "椭圆(形)",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "undignified",
+      "meaning": "不庄重的，不像样子的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "conceivable",
+      "meaning": "可想到的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "compassion",
+      "meaning": "同情，怜悯",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "dictatorship",
+      "meaning": "独裁，独裁国家，专政",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "stricken",
+      "meaning": "受折磨的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "numeral",
+      "meaning": "数的，表示数的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "cooler",
+      "meaning": "冷却器，冷却剂",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "sixtieth",
+      "meaning": "第六十个(的)",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "comparatively",
+      "meaning": "比较地",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "good-hearted",
+      "meaning": "好心肠的，仁慈的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "satire",
+      "meaning": "讥讽，讽刺作品",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "saying",
+      "meaning": "谚语，格言",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "grime",
+      "meaning": "污垢，污物",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "Rome",
+      "meaning": "罗马",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "Englishwoman",
+      "meaning": "英国女人，英格兰女人",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "seashore",
+      "meaning": "海岸，海滨，海边",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "submission",
+      "meaning": "归顺，屈从",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "blouse",
+      "meaning": "女衬衫",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "monologue",
+      "meaning": "独白",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "temperamental",
+      "meaning": "气质(上)的，生来的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "cooperation",
+      "meaning": "合作，协力，合作的意愿",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "twig",
+      "meaning": "嫩枝，细枝",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "infection",
+      "meaning": "传染(病)，感染，影响",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "et",
+      "meaning": "等等之人(物)",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "monarch",
+      "meaning": "君主，帝王",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "indoor",
+      "meaning": "户内的，室内的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "untidy",
+      "meaning": "不整齐的，凌乱的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "thoughtless",
+      "meaning": "无思想的",
+      "source": "专业四级",
+      "band": "tem4",
+      "level": 3
+    },
+    {
+      "word": "viscera",
+      "meaning": "内脏，(指)肠",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "hardball",
+      "meaning": "棒球",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "titanic",
+      "meaning": "巨大的，极大的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "cudgel",
+      "meaning": "棒，短棍",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "heresy",
+      "meaning": "(宗教方面)异端，持异端邪说",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "untold",
+      "meaning": "未说过的，未透露的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "hotpot",
+      "meaning": "炖(焖)的肉和蔬菜，火锅",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "abject",
+      "meaning": "(境况)凄惨的，绝望的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "browser",
+      "meaning": "浏览器",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "sprint",
+      "meaning": "用全速奔跑，疾跑",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "highbrow",
+      "meaning": "风雅之士，博学多才(的)",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "flywheel",
+      "meaning": "飞轮，惯性轮",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "vernacular",
+      "meaning": "用本国语的，用地方话的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "masked",
+      "meaning": "戴面具的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "impregnate",
+      "meaning": "使浸透，使充满",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "ascendant",
+      "meaning": "权势日益增强的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "inculcate",
+      "meaning": "反复灌输，谆谆教诲",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "dangle",
+      "meaning": "(使)悬荡，(使)悬垂",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "baleful",
+      "meaning": "凶恶的，有害的，险恶的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "rabid",
+      "meaning": "患狂犬病的，极端的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "loot",
+      "meaning": "掠夺物，赃物 v. 掠夺，抢劫",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "indisputable",
+      "meaning": "不可争辩的，不容置疑的，无可否认的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "tenuous",
+      "meaning": "薄的，细的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "reservist",
+      "meaning": "预备役军人",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "manure",
+      "meaning": "粪，肥料",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "exult",
+      "meaning": "狂喜，欢腾",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "philanthropic",
+      "meaning": "博爱的，慈善的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "frontbench",
+      "meaning": "前排",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "lucid",
+      "meaning": "明白易懂的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "waver",
+      "meaning": "减弱，动摇",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "stupor",
+      "meaning": "(震惊、药物、酒精等造成的)昏迷，神志不清",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "juvenile",
+      "meaning": "青少年的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "drive-in",
+      "meaning": "“免下车”(餐馆、影院、银行等)",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "flair",
+      "meaning": "天赋，本领，才华",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "scholastic",
+      "meaning": "学校的，学业的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "wizard",
+      "meaning": "男巫，巫师",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "hooray",
+      "meaning": "加油，欢呼声",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "handstand",
+      "meaning": "倒立",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "nag",
+      "meaning": "不停地唠叨，不断地责骂",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "canopy",
+      "meaning": "(床等物上面的)篷盖",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "ineluctable",
+      "meaning": "不可避免的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "embroil",
+      "meaning": "使卷入",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "rubdown",
+      "meaning": "擦拭，擦干",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "skid",
+      "meaning": "打滑，滑向一侧",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "vigil",
+      "meaning": "守夜，彻夜不眠",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "affront",
+      "meaning": "侮辱，冒犯",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "therewith",
+      "meaning": "外加，随即",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "rugger",
+      "meaning": "(英式)橄榄球(运动)",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "fateful",
+      "meaning": "重大的，决定性的",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    },
+    {
+      "word": "bog",
+      "meaning": "沼泽，泥塘，沼泽地区",
+      "source": "专业八级",
+      "band": "tem8",
+      "level": 4
+    }
+  ]
+}

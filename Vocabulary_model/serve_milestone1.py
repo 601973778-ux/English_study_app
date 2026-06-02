@@ -54,6 +54,11 @@ try:
         generate_quiz,
         grade_quiz,
     )
+    from Vocabulary_model.placement.service import (
+        apply_recommendation_to_settings,
+        start_placement,
+        submit_answer,
+    )
 except ModuleNotFoundError:  # pragma: no cover
     # 当直接执行 d:/.../milestone1/serve_milestone1.py 时可用
     from similar_neighbors_service import (
@@ -341,6 +346,54 @@ class Milestone1Handler(http.server.SimpleHTTPRequestHandler):
                 status, body = save_user_settings_with_plan(
                     _DAILY_STORE,
                     payload,
+                    review_store=_REVIEW_STORE,
+                    get_entries=_ensure_entries,
+                )
+                new_wb = str(body.get("wordbook_id", prev_wb))
+                if new_wb != prev_wb:
+                    invalidate_entries()
+                    invalidate_similar_cache(prev_wb)
+                    invalidate_similar_cache(new_wb)
+                    _SESSION = None
+                elif body.get("session_cleared"):
+                    _SESSION = None
+                body["wordbook_label"] = wordbook_label(new_wb)
+                self._send_json(body, status=status)
+                return
+
+            if req_path == "/api/placement/start":
+                self._send_json(start_placement())
+                return
+            if req_path == "/api/placement/submit":
+                placement_id = str(payload.get("placement_id") or "").strip()
+                quiz_id = str(payload.get("quiz_id") or "").strip()
+                if not placement_id or not quiz_id:
+                    self._send_json({"error": "missing placement_id or quiz_id"}, status=400)
+                    return
+                try:
+                    self._send_json(
+                        submit_answer(
+                            placement_id=placement_id,
+                            quiz_id=quiz_id,
+                            answer=payload.get("answer"),
+                        )
+                    )
+                except ValueError as e:
+                    self._send_json({"error": str(e)}, status=400)
+                return
+            if req_path == "/api/placement/apply":
+                result = payload.get("result")
+                if not isinstance(result, dict) or not result.get("mastered_band"):
+                    self._send_json({"error": "missing assessment result"}, status=400)
+                    return
+                prev = load_user_settings()
+                prev_wb = str(prev.get("wordbook_id", "cet6"))
+                patch = apply_recommendation_to_settings(prev, result)
+                if payload.get("confirm_rebuild"):
+                    patch["confirm_rebuild"] = True
+                status, body = save_user_settings_with_plan(
+                    _DAILY_STORE,
+                    patch,
                     review_store=_REVIEW_STORE,
                     get_entries=_ensure_entries,
                 )

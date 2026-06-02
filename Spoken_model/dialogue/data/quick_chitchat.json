@@ -1,0 +1,38 @@
+{
+  "title": "Fast-path replies for short greetings and social phrases (no LLM)",
+  "rules": [
+    {
+      "id": "hello",
+      "patterns": ["hello", "hi", "hey", "good morning", "good afternoon", "good evening", "howdy"],
+      "replies": [
+        "Hello! Welcome. Table for how many, or would you like to order to go?",
+        "Hi there! Thanks for coming in. How can I help you today?",
+        "Good evening! Welcome to our restaurant. Do you have a reservation?"
+      ]
+    },
+    {
+      "id": "thanks",
+      "patterns": ["thank you", "thanks", "appreciate", "thank"],
+      "replies": [
+        "You're very welcome! Is there anything else I can get for you?",
+        "My pleasure! Let me know if you need anything else."
+      ]
+    },
+    {
+      "id": "bye",
+      "patterns": ["bye", "goodbye", "see you", "have a nice", "take care"],
+      "replies": [
+        "Thank you for dining with us. Have a wonderful evening!",
+        "Goodbye! We hope to see you again soon."
+      ]
+    },
+    {
+      "id": "sorry",
+      "patterns": ["sorry", "excuse me", "pardon"],
+      "replies": [
+        "No worries at all. How can I help you?",
+        "That's quite all right. What would you like to order?"
+      ]
+    }
+  ]
+}

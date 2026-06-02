@@ -368,7 +368,7 @@ class StudySession:
     def _word_progress_payload(self, word: str) -> dict[str, int | bool | str]:
         reinforce = word in self.word_reinforce
         stage = self._reinforce_stage_of(word) if reinforce else 0
-        labels = {1: "自评", 2: "四选一", 3: "填空"}
+        labels = {1: "自评", 2: "释义四选一", 3: "选词四选一"}
         return {
             "reinforce": reinforce,
             "stage": stage,
@@ -401,7 +401,16 @@ class StudySession:
         self.word_reinforce.discard(clean)
 
     def peek_word_completed_on_next(self) -> str | None:
-        """毕业仅发生在阶段 3 测验通过时，不再通过「下一个」触发。"""
+        """若下一次 next 会算作「今日完成」，返回该词（调用 next 前使用）。"""
+        if (
+            self.waiting_next_after_meaning
+            and self.review_mode == "known"
+            and self.current
+        ):
+            word = self.current.word
+            # 未进入巩固的词：认识→下一个 一次通过即毕业
+            if word not in self.word_reinforce:
+                return word
         return None
 
     def apply_quiz_result(
@@ -415,11 +424,19 @@ class StudySession:
             self._graduate_word(clean)
             self._show_current_word()
             return clean
-        next_stage = result.get("next_stage")
-        if isinstance(next_stage, int) and 1 <= next_stage <= 3:
-            self.reinforce_stage[clean] = next_stage
-        if result.get("advance_variant"):
+        stage = int(result.get("stage") or 0)
+        if result.get("correct") and stage in (2, 3):
+            next_stage = result.get("next_stage")
+            if isinstance(next_stage, int) and 1 <= next_stage <= 3:
+                self.reinforce_stage[clean] = next_stage
+            if result.get("pick_next_word"):
+                self._show_current_word()
+        elif result.get("advance_variant"):
             self.mcq_variant[clean] = int(self.mcq_variant.get(clean, 0)) + 1
+        else:
+            next_stage = result.get("next_stage")
+            if isinstance(next_stage, int) and 1 <= next_stage <= 3:
+                self.reinforce_stage[clean] = next_stage
         self.waiting_next_after_meaning = False
         self.review_mode = ""
         return None
@@ -509,7 +526,7 @@ class StudySession:
         reinforce_stage = self._reinforce_stage_of(self.current.word)
 
         if reinforce_stage >= 2 and not self.waiting_next_after_meaning:
-            labels = {2: "四选一", 3: "填空"}
+            labels = {2: "释义四选一", 3: "选词四选一"}
             return {
                 "phase": "reinforce_quiz",
                 "quizStage": reinforce_stage,
@@ -633,6 +650,7 @@ class StudySession:
                         self.reinforce_stage[word] = 2
                         self.waiting_next_after_meaning = False
                         self.review_mode = ""
+                        self._show_current_word()
                         return self.state()
                 else:
                     self._graduate_word(word)

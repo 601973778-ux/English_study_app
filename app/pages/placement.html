@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>词汇水平评估 · 单词学习</title>
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.3.4.3.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.1.0.7.js"></script>
+<style>
+  body { background: #F4F4F4; font-family: system-ui, sans-serif; }
+  .option-btn { transition: all .15s ease; }
+  .option-btn:hover:not(:disabled) { border-color: #2563EB; background: #EFF6FF; }
+  .option-btn:disabled { opacity: .55; cursor: not-allowed; }
+  #confirmModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 1rem;
+  }
+  #confirmModal.open { display: flex; }
+</style>
+</head>
+<body class="min-h-screen p-6 md:p-10">
+  <div class="max-w-2xl mx-auto">
+    <div class="flex items-center justify-between mb-6">
+      <div>
+        <h1 class="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <iconify-icon icon="ph:exam-bold" class="text-blue-600 text-3xl"></iconify-icon>
+          词汇水平评估
+        </h1>
+        <p class="text-sm text-gray-500 mt-1">10 题自适应测验 · 英文单词选中文释义 · 提交后显示反馈</p>
+      </div>
+      <a href="/app/index.html" class="text-sm text-gray-600 hover:text-blue-600 inline-flex items-center gap-1">
+        <iconify-icon icon="ph:arrow-left-bold"></iconify-icon> 返回背诵
+      </a>
+    </div>
+
+    <div id="introPanel" class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+      <h2 class="text-lg font-semibold text-gray-900 mb-3">开始评估</h2>
+      <ul class="text-sm text-gray-600 space-y-2 mb-6 list-disc pl-5">
+        <li>共 10 题，系统会根据你的作答自适应调整难度</li>
+        <li>题型：看英文单词，从四个中文释义中选一个（含 1 个形近词释义干扰项，由大模型生成）</li>
+        <li>答错不扣分，按各难度档正确率综合判定水平</li>
+        <li>完成后可一键应用推荐词书与每日词量</li>
+      </ul>
+      <button id="startBtn" type="button" class="px-6 py-3 rounded-lg bg-blue-600 text-white font-semibold hover:bg-blue-500">
+        开始评估
+      </button>
+      <p id="lastResultHint" class="text-xs text-gray-400 mt-4 hidden"></p>
+    </div>
+
+    <div id="quizPanel" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+      <div class="flex items-center justify-between mb-4">
+        <span id="phaseLabel" class="text-xs font-semibold uppercase tracking-wider text-blue-600 bg-blue-50 px-2 py-1 rounded">探针</span>
+        <span id="progressLabel" class="text-sm text-gray-500">第 1 / 10 题</span>
+      </div>
+      <div class="w-full bg-gray-100 h-1.5 rounded-full mb-6">
+        <div id="progressBar" class="bg-blue-600 h-1.5 rounded-full transition-all" style="width:10%"></div>
+      </div>
+      <p id="quizPrompt" class="text-xl font-bold text-gray-900 mb-2"></p>
+      <p id="quizMeta" class="text-xs text-gray-400 mb-6"></p>
+      <div id="optionsWrap" class="space-y-3"></div>
+      <p id="feedback" class="mt-4 text-sm hidden"></p>
+    </div>
+
+    <div id="resultPanel" class="hidden bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+      <h2 class="text-xl font-bold text-gray-900 mb-2">评估完成</h2>
+      <p id="resultLevel" class="text-2xl font-bold text-blue-600 mb-1"></p>
+      <p id="resultSummary" class="text-sm text-gray-600 mb-6"></p>
+      <div id="bandScores" class="grid grid-cols-2 gap-3 mb-6 text-sm"></div>
+      <div class="bg-blue-50 rounded-lg p-4 mb-6">
+        <p class="text-sm text-blue-900 font-medium">推荐设置</p>
+        <p id="recommendText" class="text-sm text-blue-700 mt-1"></p>
+      </div>
+      <div class="flex flex-wrap gap-3">
+        <button id="applyBtn" type="button" class="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">应用推荐设置</button>
+        <button id="retryBtn" type="button" class="px-5 py-2.5 rounded-lg border border-gray-300 text-sm hover:bg-gray-50">重新评估</button>
+        <a href="/app/index.html" class="px-5 py-2.5 rounded-lg border border-gray-300 text-sm inline-flex items-center hover:bg-gray-50">去背单词</a>
+      </div>
+      <p id="applyMsg" class="text-sm mt-4 text-gray-600"></p>
+    </div>
+
+    <p id="errMsg" class="mt-4 text-sm text-red-600 hidden"></p>
+  </div>
+
+  <div id="confirmModal" role="dialog" aria-modal="true">
+    <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl border border-gray-200">
+      <h2 class="text-lg font-semibold text-gray-900 mb-2">确认应用推荐</h2>
+      <p id="confirmText" class="text-sm text-gray-600 leading-relaxed mb-6">
+        将切换词书并调整每日词量。若今日计划进行中，未完成部分会按新设置重排。是否继续？
+      </p>
+      <div class="flex justify-end gap-3">
+        <button type="button" id="confirmCancel" class="px-4 py-2 rounded-lg border border-gray-300 text-sm">取消</button>
+        <button type="button" id="confirmOk" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold">确定应用</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const PHASE_LABEL = { probe: "探针", main: "主测", adjacent: "相邻档", confirm: "确认" };
+    let placementId = null;
+    let currentQuiz = null;
+    let submitting = false;
+    let lastResult = null;
+    let loadedSettings = null;
+
+    const introPanel = document.getElementById("introPanel");
+    const quizPanel = document.getElementById("quizPanel");
+    const resultPanel = document.getElementById("resultPanel");
+    const errMsg = document.getElementById("errMsg");
+
+    function showError(msg) {
+      errMsg.textContent = msg || "发生错误";
+      errMsg.classList.remove("hidden");
+    }
+    function clearError() {
+      errMsg.classList.add("hidden");
+      errMsg.textContent = "";
+    }
+
+    async function apiPost(path, body) {
+      const res = await fetch(path, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        const err = new Error(data.confirm_message || data.error || `HTTP ${res.status}`);
+        err.status = res.status;
+        err.data = data;
+        throw err;
+      }
+      return data;
+    }
+
+    async function apiGet(path) {
+      const res = await fetch(path);
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      return data;
+    }
+
+    function setProgress(index, total) {
+      document.getElementById("progressLabel").textContent = `第 ${index + 1} / ${total} 题`;
+      document.getElementById("progressBar").style.width = `${Math.round(((index + 1) / total) * 100)}%`;
+    }
+
+    function renderQuiz(data) {
+      const quiz = data.quiz;
+      if (!quiz) return;
+      currentQuiz = quiz;
+      placementId = data.placement_id || placementId;
+      introPanel.classList.add("hidden");
+      resultPanel.classList.add("hidden");
+      quizPanel.classList.remove("hidden");
+      document.getElementById("phaseLabel").textContent = PHASE_LABEL[data.phase] || data.phase || "";
+      setProgress(data.index ?? 0, data.total ?? 10);
+      document.getElementById("quizPrompt").textContent = quiz.prompt || quiz.word || "";
+      document.getElementById("quizMeta").textContent = quiz.source ? `来源：${quiz.source}` : "";
+      const fb = document.getElementById("feedback");
+      fb.classList.add("hidden");
+      fb.textContent = "";
+      const wrap = document.getElementById("optionsWrap");
+      wrap.innerHTML = "";
+      (quiz.options || []).forEach((opt, idx) => {
+        const btn = document.createElement("button");
+        btn.type = "button";
+        btn.className = "option-btn w-full text-left px-4 py-3 rounded-lg border border-gray-200 bg-white text-sm";
+        btn.textContent = opt;
+        btn.addEventListener("click", () => submitAnswer(idx));
+        wrap.appendChild(btn);
+      });
+    }
+
+    async function submitAnswer(answer) {
+      if (submitting || !currentQuiz || !placementId) return;
+      submitting = true;
+      document.querySelectorAll("#optionsWrap button").forEach((b) => { b.disabled = true; });
+      clearError();
+      try {
+        const data = await apiPost("/api/placement/submit", {
+          placement_id: placementId,
+          quiz_id: currentQuiz.quiz_id,
+          answer: answer,
+        });
+        const fb = document.getElementById("feedback");
+        fb.textContent = data.feedback || (data.correct ? "回答正确" : "回答不正确");
+        fb.className = "mt-4 text-sm " + (data.correct ? "text-green-700" : "text-amber-700");
+        fb.classList.remove("hidden");
+        if (data.finished && data.result) {
+          setTimeout(() => showResult(data.result), 600);
+        } else if (data.quiz) {
+          setTimeout(() => renderQuiz(data), 700);
+        }
+      } catch (e) {
+        showError(e.message);
+        document.querySelectorAll("#optionsWrap button").forEach((b) => { b.disabled = false; });
+      } finally {
+        submitting = false;
+      }
+    }
+
+    const BAND_CN = { cet4: "四级", cet6: "六级", tem4: "专四", tem8: "专八" };
+
+    function showResult(result) {
+      lastResult = result;
+      quizPanel.classList.add("hidden");
+      resultPanel.classList.remove("hidden");
+      document.getElementById("resultLevel").textContent = result.level_label || "";
+      document.getElementById("resultSummary").textContent =
+        `答对 ${result.correct}/${result.total} 题 · 加权得分 ${result.percent}%`;
+      const scoresEl = document.getElementById("bandScores");
+      scoresEl.innerHTML = "";
+      const scores = result.band_scores || {};
+      Object.keys(BAND_CN).forEach((b) => {
+        const div = document.createElement("div");
+        div.className = "rounded-lg border border-gray-100 bg-gray-50 px-3 py-2";
+        const pct = Math.round((scores[b] || 0) * 100);
+        div.innerHTML = `<span class="text-gray-500">${BAND_CN[b]}</span> <span class="font-semibold float-right">${pct}%</span>`;
+        scoresEl.appendChild(div);
+      });
+      document.getElementById("recommendText").textContent =
+        `词书：${result.recommend_wordbook_id || ""} · 每日 ${result.recommend_daily_words || 50} 词`;
+      document.getElementById("applyMsg").textContent = "";
+    }
+
+    async function startAssessment() {
+      clearError();
+      document.getElementById("startBtn").disabled = true;
+      try {
+        const data = await apiPost("/api/placement/start");
+        renderQuiz(data);
+      } catch (e) {
+        showError(e.message);
+      } finally {
+        document.getElementById("startBtn").disabled = false;
+      }
+    }
+
+    function needsConfirm() {
+      if (!loadedSettings || !lastResult) return false;
+      const wb = String(lastResult.recommend_wordbook_id || "");
+      const daily = Number(lastResult.recommend_daily_words || 0);
+      return String(loadedSettings.wordbook_id || "") !== wb
+        || Number(loadedSettings.daily_words || 0) !== daily;
+    }
+
+    async function applyRecommendation(forceConfirm) {
+      if (!lastResult) return;
+      document.getElementById("applyMsg").textContent = "正在保存…";
+      try {
+        const body = { result: lastResult };
+        if (forceConfirm) body.confirm_rebuild = true;
+        const saved = await apiPost("/api/placement/apply", body);
+        loadedSettings = saved;
+        let msg = "已应用推荐设置。";
+        if (saved.session_cleared) msg += " 今日计划已重排，请返回背诵页继续。";
+        else if (saved.settings_apply_when === "tomorrow") msg += " 今日已完成，新设置明天生效。";
+        document.getElementById("applyMsg").textContent = msg;
+      } catch (e) {
+        if (e.status === 409 && !forceConfirm) {
+          document.getElementById("confirmText").textContent =
+            e.data?.confirm_message || "更改将影响今日计划，是否确定应用？";
+          document.getElementById("confirmModal").classList.add("open");
+          document.getElementById("applyMsg").textContent = "";
+          return;
+        }
+        document.getElementById("applyMsg").textContent = e.message;
+      }
+    }
+
+    document.getElementById("startBtn").addEventListener("click", startAssessment);
+    document.getElementById("retryBtn").addEventListener("click", () => {
+      placementId = null;
+      currentQuiz = null;
+      lastResult = null;
+      introPanel.classList.remove("hidden");
+      quizPanel.classList.add("hidden");
+      resultPanel.classList.add("hidden");
+      clearError();
+    });
+    document.getElementById("applyBtn").addEventListener("click", () => {
+      if (needsConfirm()) {
+        document.getElementById("confirmText").textContent =
+          "将切换词书并调整每日词量。若今日计划进行中，未完成部分会按新设置重排。是否继续？";
+        document.getElementById("confirmModal").classList.add("open");
+      } else {
+        applyRecommendation(false);
+      }
+    });
+    document.getElementById("confirmCancel").addEventListener("click", () => {
+      document.getElementById("confirmModal").classList.remove("open");
+    });
+    document.getElementById("confirmOk").addEventListener("click", () => {
+      document.getElementById("confirmModal").classList.remove("open");
+      applyRecommendation(true);
+    });
+
+    (async function init() {
+      try {
+        loadedSettings = await apiGet("/api/settings");
+        const hint = document.getElementById("lastResultHint");
+        if (loadedSettings.placement_label) {
+          hint.textContent = `上次评估：${loadedSettings.placement_label}（${loadedSettings.placement_at || ""}）`;
+          hint.classList.remove("hidden");
+        }
+      } catch (_) { /* ignore */ }
+    })();
+  </script>
+</body>
+</html>

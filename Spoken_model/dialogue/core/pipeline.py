@@ -12,6 +12,8 @@ from Spoken_model.dialogue.contracts.protocols import (
 from Spoken_model.dialogue.contracts.types import RouteKind, SessionState, TurnRequest, TurnResult
 from Spoken_model.dialogue.core.cycle_manager import increment_user_turn
 from Spoken_model.dialogue.core.text_normalizer import normalize_user_text
+from Spoken_model.dialogue.dialogue_flags import is_script_engine_frozen
+from Spoken_model.dialogue.engines.quick_chitchat_engine import QuickChitchatEngine
 from Spoken_model.dialogue.engines.rag_llm_engine import RagLlmEngine
 from Spoken_model.dialogue.engines.script_engine import ScriptEngine
 
@@ -26,10 +28,15 @@ class TurnPipeline:
         llm: LlmAdapter | None,
         llm_enabled: bool = True,
         rag_min_score: float = 0.0,
+        script_engine_frozen: bool | None = None,
     ) -> None:
         self._asr = asr
         self._tts = tts
+        self._script_frozen = (
+            is_script_engine_frozen() if script_engine_frozen is None else script_engine_frozen
+        )
         self._script = ScriptEngine()
+        self._quick_chitchat = QuickChitchatEngine()
         self._rag = RagLlmEngine(
             retriever, llm, llm_enabled=llm_enabled, rag_min_score=rag_min_score
         )
@@ -53,21 +60,45 @@ class TurnPipeline:
         session: SessionState,
         user_text: str,
     ) -> TurnResult:
-        route = plugin.classify(user_text, session)
         reply: str | None = None
         next_stage: str | None = None
-        meta: dict = {"route": route.value}
+        meta: dict = {"script_frozen": self._script_frozen}
 
-        if route != RouteKind.RAG_LLM:
-            reply, next_stage = self._script.try_reply(plugin, user_text, session, route)
-
-        if route == RouteKind.RAG_LLM or reply is None:
+        if self._script_frozen:
             route = RouteKind.RAG_LLM
-            reply, hits = self._rag.generate(plugin, user_text, session)
-            meta["rag_hits"] = [
-                {"score": h.get("score"), "chunk_type": h.get("chunk_type"), "topic_id": h.get("topic_id")}
-                for h in hits[:3]
-            ]
+            reply = self._quick_chitchat.try_reply(user_text, session)
+            if reply:
+                route = RouteKind.QUICK_CHITCHAT
+            else:
+                reply, hits = self._rag.generate(plugin, user_text, session)
+                meta["rag_hits"] = [
+                    {
+                        "score": h.get("score"),
+                        "chunk_type": h.get("chunk_type"),
+                        "topic_id": h.get("topic_id"),
+                    }
+                    for h in hits[:3]
+                ]
+            meta["route"] = route.value
+        else:
+            route = plugin.classify(user_text, session)
+            meta["route"] = route.value
+
+            if route != RouteKind.RAG_LLM:
+                reply, next_stage = self._script.try_reply(plugin, user_text, session, route)
+
+            if route == RouteKind.RAG_LLM or reply is None:
+                route = RouteKind.RAG_LLM
+                reply, hits = self._rag.generate(plugin, user_text, session)
+                meta["rag_hits"] = [
+                    {
+                        "score": h.get("score"),
+                        "chunk_type": h.get("chunk_type"),
+                        "topic_id": h.get("topic_id"),
+                    }
+                    for h in hits[:3]
+                ]
+                meta["route"] = route.value
 
         if next_stage:
             session.stage = next_stage

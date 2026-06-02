@@ -11,6 +11,7 @@ from Spoken_model.dialogue.core.cycle_manager import continue_cycle, end_session
 from Spoken_model.dialogue.core.pipeline import TurnPipeline
 from Spoken_model.dialogue.core.registry import get_scenario, list_scenarios
 from Spoken_model.dialogue.core.session_store import SessionStore
+from Spoken_model.dialogue.dialogue_flags import is_script_engine_frozen
 from Spoken_model.dialogue.evaluation.rule_evaluator import evaluate_cycle
 from Spoken_model.dialogue.scenarios.loader import JsonScenarioPlugin
 
@@ -42,6 +43,17 @@ class DialogueService:
             "ready": self._llm_settings.enabled and self._pipeline._rag._llm_enabled,
             "model": self._llm_settings.model,
             "base_url": self._llm_settings.base_url,
+            "script_engine_frozen": self._pipeline._script_frozen,
+        }
+
+    def routing_status(self) -> dict:
+        return {
+            "script_engine_frozen": is_script_engine_frozen(),
+            "turn_routes": (
+                ["quick_chitchat", "rag_llm"]
+                if is_script_engine_frozen()
+                else ["script", "rag_llm"]
+            ),
         }
 
     def scenarios(self) -> list[dict[str, str]]:

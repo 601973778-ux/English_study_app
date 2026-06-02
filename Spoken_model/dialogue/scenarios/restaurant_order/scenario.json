@@ -1,12 +1,19 @@
 {
   "title_zh": "餐厅点餐",
   "title_en": "Restaurant Ordering",
+  "opening_mode": "rag_llm",
+  "opening_rag_query": "waiter greeting welcome restaurant table reservation party size",
   "opening_line": "Good evening! Welcome to our restaurant. Table for how many?",
+  "opening_fallback_lines": [
+    "Good evening! Welcome to our restaurant. Table for how many?",
+    "Hi there! Thanks for coming in. How many guests tonight?",
+    "Welcome! Do you have a reservation, or shall I find you a table?"
+  ],
   "default_stage": "GREETING",
   "cycle_size": 10,
   "topic_keywords": [
-    "menu", "order", "table", "reservation", "bill", "check",
-    "steak", "salad", "soup", "dessert", "drink", "wine", "coffee",
+    "menu", "table", "reservation", "bill", "check",
+    "steak", "salad", "soup", "dessert",
     "appetizer", "main", "course", "tip", "waiter", "waitress"
   ]
 }

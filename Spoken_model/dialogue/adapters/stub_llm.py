@@ -38,16 +38,3 @@ def _extract_reference_snippets(messages: list[dict[str, str]]) -> list[str]:
                 if line.startswith("- "):
                     out.append(line[2:])
     return out
-
-
-class DeepSeekLlm:
-    """Placeholder for future local DeepSeek adapter."""
-
-    def __init__(self, *, base_url: str = "http://127.0.0.1:11434", model: str = "deepseek") -> None:
-        self.base_url = base_url
-        self.model = model
-
-    def chat(self, system: str, messages: list[dict[str, str]]) -> str:
-        raise NotImplementedError(
-            "DeepSeek local LLM is not wired yet. Use StubLlm or set llm.enabled=false."
-        )

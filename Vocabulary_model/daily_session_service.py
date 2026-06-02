@@ -4,7 +4,7 @@
 
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, Callable
 
 from Vocabulary_model.daily_progress_store import DailyProgressStore, build_daily_plan_segments
 def _load_review_quotas_fn():
@@ -117,6 +117,8 @@ def ensure_today_plan(
         new_words=list(segments["new_words"]),
         new_target=int(segments["new_target"]),
         review_target=int(segments["review_target"]),
+        review_shortfall=int(review_plan.review_shortfall),
+        planned_count=int(segments["planned_count"]),
     )
 
 
@@ -132,6 +134,7 @@ def create_session_from_plan(
         planned_words=planned,
         completed_words=completed,
         review_words=list(plan.get("review_words") or []),
+        new_words=list(plan.get("new_words") or []),
         snapshot=snapshot,
     )
     return session
@@ -207,6 +210,257 @@ def save_session_snapshot(
     store.save_session_snapshot(wordbook_id, session.to_snapshot())
 
 
+def confirm_rebuild_requested(payload: dict[str, Any]) -> bool:
+    v = payload.get("confirm_rebuild")
+    return v in (True, 1, "1", "true", "yes")
+
+
+def settings_affect_today_plan(prev: dict[str, Any], new: dict[str, Any]) -> bool:
+    def _wb(v: Any) -> str:
+        return str(v or "cet6").strip()
+
+    try:
+        prev_daily = int(prev.get("daily_words", 50))
+    except (TypeError, ValueError):
+        prev_daily = 50
+    try:
+        new_daily = int(new.get("daily_words", 50))
+    except (TypeError, ValueError):
+        new_daily = 50
+    return (
+        prev_daily != new_daily
+        or str(prev.get("review_ratio", "1:1")) != str(new.get("review_ratio", "1:1"))
+        or _wb(prev.get("wordbook_id")) != _wb(new.get("wordbook_id"))
+    )
+
+
+def needs_settings_confirm(
+    prev: dict[str, Any],
+    proposed: dict[str, Any],
+    store: DailyProgressStore,
+) -> bool:
+    return settings_confirm_mode(prev, proposed, store) is not None
+
+
+def settings_confirm_mode(
+    prev: dict[str, Any],
+    proposed: dict[str, Any],
+    store: DailyProgressStore,
+) -> str | None:
+    """返回确认类型：rebuild=重排今日未完成计划；tomorrow=今日已完成，新设置明天生效。"""
+    if not settings_affect_today_plan(prev, proposed):
+        return None
+    prev_wb = str(prev.get("wordbook_id", "cet6"))
+    new_wb = str(proposed.get("wordbook_id", prev_wb))
+    saw_completed = False
+    for wid in {prev_wb, new_wb}:
+        status = str(store.progress_payload(wid).get("status", "none"))
+        if status == "in_progress":
+            return "rebuild"
+        if status == "completed":
+            saw_completed = True
+    if saw_completed:
+        return "tomorrow"
+    return None
+
+
+def _merge_word_into_bucket(
+    bucket: list[str], word: str, completed_cf: set[str]
+) -> None:
+    w = str(word).strip()
+    if not w or w.casefold() in completed_cf:
+        return
+    if any(x.casefold() == w.casefold() for x in bucket):
+        return
+    bucket.append(w)
+
+
+def push_unfinished_plan_to_carryover(
+    store: DailyProgressStore,
+    wordbook_id: str,
+    plan: dict[str, Any],
+) -> None:
+    completed_cf = {w.casefold() for w in (plan.get("completed_words") or [])}
+    review_set = {
+        str(w).strip().casefold() for w in (plan.get("review_words") or [])
+    }
+    new_set = {str(w).strip().casefold() for w in (plan.get("new_words") or [])}
+    carry_review = store.get_carryover_review_words(wordbook_id)
+    carry_new = store.get_carryover_new_words(wordbook_id)
+    for w in plan.get("planned_words") or []:
+        w = str(w).strip()
+        if not w or w.casefold() in completed_cf:
+            continue
+        k = w.casefold()
+        if k in new_set and k not in review_set:
+            _merge_word_into_bucket(carry_new, w, completed_cf)
+        else:
+            _merge_word_into_bucket(carry_review, w, completed_cf)
+    store.set_carryover_review_words(wordbook_id, carry_review)
+    store.set_carryover_new_words(wordbook_id, carry_new)
+
+
+def rebuild_today_plan(
+    store: DailyProgressStore,
+    *,
+    wordbook_id: str,
+    entries: list[Entry],
+    daily_words: int,
+    review_ratio: str,
+    review_store: Any,
+) -> dict[str, Any] | None:
+    plan = store.get_today_plan(wordbook_id)
+    if not plan or plan.get("status") != "in_progress":
+        return None
+
+    completed = list(plan.get("completed_words") or [])
+    push_unfinished_plan_to_carryover(store, wordbook_id, plan)
+
+    carry_review = store.get_carryover_review_words(wordbook_id)
+    carry_new = store.get_carryover_new_words(wordbook_id)
+
+    new_target, review_quota = compute_daily_quotas(int(daily_words), review_ratio)
+    new_target = max(1, min(new_target, len(entries)))
+    all_words = [e.word for e in entries]
+    review_plan = review_store.build_review_plan(
+        new_target, review_ratio, wordbook_id=wordbook_id
+    )
+    completed_cf = {w.casefold() for w in completed}
+    filtered_review = [
+        w for w in review_plan.review_words if w.casefold() not in completed_cf
+    ]
+    segments = build_daily_plan_segments(
+        all_entry_words=all_words,
+        new_target=new_target,
+        review_target=review_quota,
+        review_words=filtered_review,
+        carryover_review_words=carry_review,
+        carryover_new_words=carry_new,
+        exclude_words=completed,
+    )
+    planned_cf = {w.casefold() for w in segments["planned_words"]}
+    store.set_carryover_review_words(
+        wordbook_id,
+        [w for w in carry_review if w.casefold() not in planned_cf],
+    )
+    store.set_carryover_new_words(
+        wordbook_id,
+        [w for w in carry_new if w.casefold() not in planned_cf],
+    )
+    return store.replace_today_plan(
+        wordbook_id,
+        segments=segments,
+        review_shortfall=int(review_plan.review_shortfall),
+        completed_words=completed,
+    )
+
+
+def apply_plan_changes_after_settings_save(
+    store: DailyProgressStore,
+    *,
+    prev: dict[str, Any],
+    settings: dict[str, Any],
+    entries: list[Entry],
+    review_store: Any,
+) -> None:
+    if not settings_affect_today_plan(prev, settings):
+        return
+
+    prev_wb = str(prev.get("wordbook_id", "cet6"))
+    new_wb = str(settings.get("wordbook_id", "cet6"))
+
+    if new_wb != prev_wb:
+        prev_plan = store.get_today_plan(prev_wb)
+        if prev_plan and prev_plan.get("status") == "in_progress":
+            push_unfinished_plan_to_carryover(store, prev_wb, prev_plan)
+            store.expire_today_plan(prev_wb)
+
+    plan = store.get_today_plan(new_wb)
+    if plan and plan.get("status") == "in_progress":
+        rebuild_today_plan(
+            store,
+            wordbook_id=new_wb,
+            entries=entries,
+            daily_words=int(settings.get("daily_words", 50)),
+            review_ratio=str(settings.get("review_ratio", "1:1")),
+            review_store=review_store,
+        )
+
+
+def settings_api_payload(
+    settings: dict[str, Any], store: DailyProgressStore
+) -> dict[str, Any]:
+    wid = str(settings.get("wordbook_id", "cet6"))
+    progress = store.progress_payload(wid)
+    status = str(progress.get("status", "none"))
+    return {
+        **settings,
+        "today_plan_status": status,
+        "today_plan_in_progress": status == "in_progress",
+        "today_plan_completed": status == "completed",
+        "today_completed": int(progress.get("completed", 0) or 0),
+        "today_remaining": int(progress.get("remaining", 0) or 0),
+        "today_target": int(progress.get("target", 0) or 0),
+    }
+
+
+SETTINGS_CONFIRM_MESSAGE = (
+    "更改设置后，今日未完成计划将立刻发生改动。是否确定保存？"
+)
+SETTINGS_CONFIRM_COMPLETED_MESSAGE = (
+    "今日计划已完成。保存后新设置将于明天自动生效（今日已完成进度不变）。是否确定保存？"
+)
+
+
+def _settings_confirm_message(mode: str) -> str:
+    if mode == "tomorrow":
+        return SETTINGS_CONFIRM_COMPLETED_MESSAGE
+    return SETTINGS_CONFIRM_MESSAGE
+
+
+def save_user_settings_with_plan(
+    store: DailyProgressStore,
+    payload: dict[str, Any],
+    *,
+    review_store: Any,
+    get_entries: Callable[[], list[Entry]],
+) -> tuple[int, dict[str, Any]]:
+    """保存用户设置；若影响进行中的今日计划则须 confirm_rebuild。"""
+    from Vocabulary_model.user_settings import load_user_settings, merge_user_settings, save_user_settings
+
+    prev = load_user_settings()
+    proposed = merge_user_settings(payload)
+    confirm_mode = settings_confirm_mode(prev, proposed, store)
+    if confirm_mode and not confirm_rebuild_requested(payload):
+        return 409, {
+            "error": _settings_confirm_message(confirm_mode),
+            "requires_confirm": True,
+            "confirm_mode": confirm_mode,
+            "confirm_message": _settings_confirm_message(confirm_mode),
+        }
+
+    settings = save_user_settings(payload)
+    session_cleared = False
+    settings_apply_when = None
+    if confirm_mode == "rebuild":
+        apply_plan_changes_after_settings_save(
+            store,
+            prev=prev,
+            settings=settings,
+            entries=get_entries(),
+            review_store=review_store,
+        )
+        session_cleared = True
+        settings_apply_when = "now"
+    elif confirm_mode == "tomorrow":
+        settings_apply_when = "tomorrow"
+    out = settings_api_payload(settings, store)
+    out["session_cleared"] = session_cleared
+    if settings_apply_when:
+        out["settings_apply_when"] = settings_apply_when
+    return 200, out
+
+
 def on_session_action(
     store: DailyProgressStore,
     wordbook_id: str,
@@ -233,15 +487,14 @@ def idle_progress_state(
     store.rollover_if_needed(wordbook_id)
     progress = store.progress_payload(wordbook_id)
     settings = load_user_settings()
-    new_t, rev_t = compute_daily_quotas(
-        int(settings.get("daily_words", 50)), str(settings.get("review_ratio", "1:1"))
-    )
     if progress.get("status") == "none":
+        new_t, rev_t = compute_daily_quotas(
+            int(settings.get("daily_words", 50)), str(settings.get("review_ratio", "1:1"))
+        )
         progress = {
             **progress,
-            "new_target": new_t,
-            "review_target": rev_t,
-            "target": new_t + rev_t,
+            "new_quota": new_t,
+            "review_quota": rev_t,
         }
     meta = f"「{wordbook_label}」· 词库 {entries_count} 条"
     return _idle_state(

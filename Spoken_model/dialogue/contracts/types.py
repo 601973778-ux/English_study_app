@@ -24,12 +24,15 @@ class TurnRequest:
     session_id: str
     user_text: str | None = None
     audio_b64: str | None = None
+    audio_format: str = "pcm_s16le"
+    language: str = "en"
 
 
 @dataclass
 class TurnResult:
     session_id: str
     scenario_id: str
+    user_text: str
     waiter_reply: str
     route: RouteKind
     stage: str
@@ -43,6 +46,7 @@ class TurnResult:
         return {
             "session_id": self.session_id,
             "scenario_id": self.scenario_id,
+            "user_text": self.user_text,
             "waiter_reply": self.waiter_reply,
             "route": self.route.value,
             "stage": self.stage,

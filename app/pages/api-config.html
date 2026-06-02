@@ -9,14 +9,16 @@
 <style>body { background: #F4F4F4; font-family: system-ui, sans-serif; }</style>
 </head>
 <body class="min-h-screen p-8">
-  <div class="max-w-lg mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+  <div class="max-w-2xl mx-auto space-y-8">
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
     <h1 class="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
       <iconify-icon icon="ph:plugs-connected-bold" class="text-blue-600"></iconify-icon>
-      讯飞文字转语音 API
+      讯飞语音 API
     </h1>
     <p class="text-sm text-gray-500 mb-4">
       保存至本地 <code class="bg-gray-100 px-1 rounded text-xs">user_data/xfyun_credentials.json</code>（不入 Git）。
-      发音接口：<code class="bg-gray-100 px-1 rounded text-xs">GET /api/tts</code>
+      发音：<code class="bg-gray-100 px-1 rounded text-xs">GET /api/tts</code>；
+      口语页听写：<code class="bg-gray-100 px-1 rounded text-xs">POST /api/dialogue/turn</code>（audio_b64）。
     </p>
     <p id="status" class="text-sm mb-6 px-3 py-2 rounded-lg bg-gray-50 text-gray-600">加载中…</p>
 
@@ -43,7 +45,9 @@
     <p class="text-xs text-gray-400 mt-4">
       在
       <a class="text-blue-600 hover:underline" href="https://console.xfyun.cn/services/tts" target="_blank" rel="noopener">讯飞开放平台 · 在线语音合成</a>
-      创建应用并开通 WebAPI；凭证仅保存在本机。
+      与
+      <a class="text-blue-600 hover:underline" href="https://console.xfyun.cn/services/iat" target="_blank" rel="noopener">语音听写（流式版）</a>
+      使用同一应用凭证；口语页需开通 IAT。凭证仅保存在本机。
     </p>
 
     <div class="flex flex-wrap gap-3 mt-8">
@@ -55,6 +59,60 @@
       </a>
     </div>
     <p id="msg" class="text-sm mt-4 text-gray-600" role="status" aria-live="polite"></p>
+  </div>
+
+  <div class="bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+    <h1 class="text-xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+      <iconify-icon icon="ph:brain-bold" class="text-violet-600"></iconify-icon>
+      DeepSeek 口语对话生成
+    </h1>
+    <p class="text-sm text-gray-500 mb-4">
+      保存至本地 <code class="bg-gray-100 px-1 rounded text-xs">Spoken_model/dialogue/user_data/llm_settings.json</code>（不入 Git）。
+      用于开放式对话的 RAG + LLM 生成；也支持本地 OpenAI 兼容服务（Ollama / vLLM）。
+    </p>
+    <p id="llmStatus" class="text-sm mb-6 px-3 py-2 rounded-lg bg-gray-50 text-gray-600">加载中…</p>
+
+    <div class="space-y-4">
+      <label class="flex items-center gap-2 text-sm text-gray-700">
+        <input id="llmEnabled" type="checkbox" class="rounded border-gray-300" />
+        启用 LLM 生成（关闭时仅使用脚本与 RAG 模板）
+      </label>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="llmBaseUrl">Base URL</label>
+        <input id="llmBaseUrl" type="text" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="https://api.deepseek.com/v1" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="llmModel">模型</label>
+        <input id="llmModel" type="text" autocomplete="off" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="deepseek-chat" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1" for="llmApiKey">API Key</label>
+        <input id="llmApiKey" type="password" autocomplete="new-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" placeholder="sk-..." />
+        <p class="text-xs text-gray-400 mt-1">本地服务（127.0.0.1 / localhost）可不填 Key。</p>
+      </div>
+      <div class="grid grid-cols-2 gap-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="llmMaxTokens">max_tokens</label>
+          <input id="llmMaxTokens" type="number" min="32" max="2048" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+        <div>
+          <label class="block text-sm font-medium text-gray-700 mb-1" for="llmTemperature">temperature</label>
+          <input id="llmTemperature" type="number" min="0" max="2" step="0.1" class="w-full border border-gray-300 rounded-lg px-3 py-2 text-sm" />
+        </div>
+      </div>
+    </div>
+
+    <p class="text-xs text-gray-400 mt-4">
+      在
+      <a class="text-blue-600 hover:underline" href="https://platform.deepseek.com/" target="_blank" rel="noopener">DeepSeek 开放平台</a>
+      获取 API Key；也可用环境变量 <code class="bg-gray-100 px-1 rounded text-xs">DEEPSEEK_API_KEY</code>。
+    </p>
+
+    <div class="flex flex-wrap gap-3 mt-8">
+      <button type="button" id="llmSaveBtn" class="px-5 py-2.5 rounded-lg bg-violet-600 text-white text-sm font-semibold hover:bg-violet-500">保存 LLM 配置</button>
+    </div>
+    <p id="llmMsg" class="text-sm mt-4 text-gray-600" role="status" aria-live="polite"></p>
+  </div>
   </div>
   <script>
     async function apiGet(path) {
@@ -169,6 +227,61 @@
         msg.textContent = "已清除本地配置。";
       } catch (e) {
         msg.textContent = "清除失败：" + e.message;
+      }
+    });
+
+    function renderLlmStatus(cfg) {
+      const el = document.getElementById("llmStatus");
+      if (!cfg.configured) {
+        el.className = "text-sm mb-6 px-3 py-2 rounded-lg bg-amber-50 text-amber-800";
+        el.textContent = "尚未配置 API Key（本地服务可免 Key）。";
+        return;
+      }
+      el.className = "text-sm mb-6 px-3 py-2 rounded-lg " + (cfg.ready ? "bg-green-50 text-green-800" : "bg-gray-50 text-gray-700");
+      const state = cfg.ready ? "已就绪" : (cfg.enabled ? "已启用但未就绪" : "已配置，未启用");
+      el.textContent = state + " · 模型：" + (cfg.model || "—") + (cfg.api_key ? " · Key：" + cfg.api_key : "");
+    }
+
+    async function loadLlmConfig() {
+      const cfg = await apiGet("/api/dialogue/llm-config");
+      document.getElementById("llmEnabled").checked = !!cfg.enabled;
+      document.getElementById("llmBaseUrl").value = cfg.base_url || "";
+      document.getElementById("llmModel").value = cfg.model || "";
+      document.getElementById("llmMaxTokens").value = cfg.max_tokens || 256;
+      document.getElementById("llmTemperature").value = cfg.temperature ?? 0.7;
+      const keyInput = document.getElementById("llmApiKey");
+      keyInput.value = "";
+      keyInput.placeholder = cfg.api_key ? "已保存（留空不修改）" : "sk-...";
+      renderLlmStatus(cfg);
+      return cfg;
+    }
+
+    loadLlmConfig().catch((e) => {
+      document.getElementById("llmStatus").textContent = "加载失败：" + e.message;
+    });
+
+    document.getElementById("llmSaveBtn").addEventListener("click", async () => {
+      const msg = document.getElementById("llmMsg");
+      msg.textContent = "正在保存…";
+      const enabled = document.getElementById("llmEnabled").checked;
+      const base_url = document.getElementById("llmBaseUrl").value.trim();
+      const model = document.getElementById("llmModel").value.trim();
+      const api_key = document.getElementById("llmApiKey").value.trim();
+      const max_tokens = parseInt(document.getElementById("llmMaxTokens").value, 10) || 256;
+      const temperature = parseFloat(document.getElementById("llmTemperature").value);
+      if (!base_url || !model) {
+        msg.textContent = "请填写 Base URL 与模型名称。";
+        return;
+      }
+      try {
+        const body = { enabled, base_url, model, max_tokens, temperature: isNaN(temperature) ? 0.7 : temperature };
+        if (api_key) body.api_key = api_key;
+        const cfg = await apiPost("/api/dialogue/llm-config", body);
+        document.getElementById("llmApiKey").value = "";
+        renderLlmStatus(cfg);
+        msg.textContent = "已保存，对话服务将使用新配置。";
+      } catch (e) {
+        msg.textContent = "保存失败：" + e.message;
       }
     });
   </script>

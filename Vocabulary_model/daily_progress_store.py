@@ -154,6 +154,8 @@ class DailyProgressStore:
         new_words: list[str] | None = None,
         new_target: int | None = None,
         review_target: int | None = None,
+        review_shortfall: int = 0,
+        planned_count: int | None = None,
     ) -> dict[str, Any]:
         today = self.rollover_if_needed(wordbook_id)
         data = self._load()
@@ -161,14 +163,22 @@ class DailyProgressStore:
         now = _utc_now_iso()
         rw = list(review_words or [])
         nw = list(new_words or [])
+        new_quota = int(new_target if new_target is not None else len(nw))
+        review_quota = int(review_target if review_target is not None else len(rw))
+        scheduled = int(planned_count if planned_count is not None else len(planned_words))
         plan = {
-            "target": int(target),
+            "target": scheduled,
+            "planned_count": scheduled,
             "planned_words": list(planned_words),
             "review_words": rw,
             "new_words": nw,
-            "new_target": int(new_target if new_target is not None else len(nw)),
-            "review_target": int(review_target if review_target is not None else len(rw)),
+            "new_quota": new_quota,
+            "review_quota": review_quota,
+            "new_target": len(nw),
+            "review_target": len(rw),
+            "review_shortfall": max(0, int(review_shortfall)),
             "completed_words": [],
+            "word_segments": {},
             "status": "in_progress",
             "created_at": now,
             "updated_at": now,
@@ -191,6 +201,14 @@ class DailyProgressStore:
         completed: list[str] = list(plan.get("completed_words") or [])
         if w not in completed:
             completed.append(w)
+            segments: dict[str, str] = dict(plan.get("word_segments") or {})
+            review_set = {str(x).strip() for x in (plan.get("review_words") or []) if str(x).strip()}
+            new_set = {str(x).strip() for x in (plan.get("new_words") or []) if str(x).strip()}
+            if w in review_set:
+                segments[w] = "review"
+            elif w in new_set:
+                segments[w] = "new"
+            plan["word_segments"] = segments
         plan["completed_words"] = completed
         plan["updated_at"] = _utc_now_iso()
         remaining = [x for x in plan.get("planned_words") or [] if x not in set(completed)]
@@ -252,6 +270,79 @@ class DailyProgressStore:
         self.consume_carryover_review(wordbook_id, used_words)
         self.consume_carryover_new(wordbook_id, used_words)
 
+    def set_carryover_review_words(self, wordbook_id: str, words: list[str]) -> None:
+        data = self._load()
+        bucket = self._bucket(data, wordbook_id)
+        bucket["carryover_review_words"] = [
+            str(w).strip() for w in words if str(w).strip()
+        ]
+        self._save(data)
+
+    def set_carryover_new_words(self, wordbook_id: str, words: list[str]) -> None:
+        data = self._load()
+        bucket = self._bucket(data, wordbook_id)
+        bucket["carryover_new_words"] = [
+            str(w).strip() for w in words if str(w).strip()
+        ]
+        self._save(data)
+
+    def replace_today_plan(
+        self,
+        wordbook_id: str,
+        *,
+        segments: dict[str, Any],
+        review_shortfall: int,
+        completed_words: list[str],
+    ) -> dict[str, Any]:
+        today = today_key(self.tz_name)
+        data = self._load()
+        bucket = self._bucket(data, wordbook_id)
+        plan = bucket["plans"].get(today)
+        if not isinstance(plan, dict):
+            raise ValueError("今日尚无学习计划，无法重排")
+        rw = list(segments["review_words"])
+        nw = list(segments["new_words"])
+        planned = list(segments["planned_words"])
+        scheduled = int(segments["planned_count"])
+        new_quota = int(segments["new_target"])
+        review_quota = int(segments["review_target"])
+        completed = list(completed_words)
+        completed_set = set(completed)
+        remaining = [w for w in planned if w not in completed_set]
+        word_segments = dict(plan.get("word_segments") or {})
+        plan.update(
+            {
+                "target": len(completed) + len(remaining),
+                "planned_count": scheduled,
+                "planned_words": planned,
+                "review_words": rw,
+                "new_words": nw,
+                "new_quota": new_quota,
+                "review_quota": review_quota,
+                "new_target": len(nw),
+                "review_target": len(rw),
+                "review_shortfall": max(0, int(review_shortfall)),
+                "completed_words": completed,
+                "word_segments": word_segments,
+                "status": "completed" if not remaining else "in_progress",
+                "updated_at": _utc_now_iso(),
+            }
+        )
+        bucket["session"] = None
+        self._save(data)
+        return plan
+
+    def expire_today_plan(self, wordbook_id: str) -> None:
+        today = today_key(self.tz_name)
+        data = self._load()
+        bucket = self._bucket(data, wordbook_id)
+        plan = bucket["plans"].get(today)
+        if isinstance(plan, dict) and plan.get("status") == "in_progress":
+            plan["status"] = "expired"
+            plan["updated_at"] = _utc_now_iso()
+        bucket["session"] = None
+        self._save(data)
+
     def save_session_snapshot(self, wordbook_id: str, snapshot: dict[str, Any]) -> None:
         today = today_key(self.tz_name)
         data = self._load()
@@ -282,6 +373,53 @@ class DailyProgressStore:
             return None
         return snap
 
+    @staticmethod
+    def _segment_of_word(word: str, plan: dict[str, Any]) -> str:
+        w = str(word).strip()
+        if not w:
+            return "review"
+        segments = plan.get("word_segments") or {}
+        if isinstance(segments, dict) and w in segments:
+            seg = str(segments[w]).strip().lower()
+            if seg in ("review", "new"):
+                return seg
+        review_cf = {
+            str(x).strip().casefold()
+            for x in (plan.get("review_words") or [])
+            if str(x).strip()
+        }
+        new_cf = {
+            str(x).strip().casefold()
+            for x in (plan.get("new_words") or [])
+            if str(x).strip()
+        }
+        k = w.casefold()
+        if k in new_cf:
+            return "new"
+        if k in review_cf:
+            return "review"
+        # 重排前已完成、当前段列表中已不存在的词，按复习计入（兼容旧数据）
+        return "review"
+
+    @classmethod
+    def _daily_segment_progress(cls, plan: dict[str, Any]) -> tuple[int, int, int, int]:
+        """返回 (复习完成, 复习实际排入, 新学完成, 新学实际排入)。"""
+        review_words = list(plan.get("review_words") or [])
+        new_words = list(plan.get("new_words") or [])
+        completed_list = list(plan.get("completed_words") or [])
+        completed_set = set(completed_list)
+        review_done = sum(
+            1 for w in completed_list if cls._segment_of_word(w, plan) == "review"
+        )
+        new_done = sum(
+            1 for w in completed_list if cls._segment_of_word(w, plan) == "new"
+        )
+        review_remaining = sum(1 for w in review_words if w not in completed_set)
+        new_remaining = sum(1 for w in new_words if w not in completed_set)
+        review_scheduled = review_done + review_remaining
+        new_scheduled = new_done + new_remaining
+        return review_done, review_scheduled, new_done, new_scheduled
+
     def progress_payload(self, wordbook_id: str) -> dict[str, Any]:
         today = self.rollover_if_needed(wordbook_id)
         plan = self.get_today_plan(wordbook_id)
@@ -301,18 +439,26 @@ class DailyProgressStore:
                 "status": "none",
                 "resumable": False,
             }
-        target = int(plan.get("target", 0))
         review_words = list(plan.get("review_words") or [])
         new_words = list(plan.get("new_words") or [])
+        planned_words = list(plan.get("planned_words") or [])
         completed_set = set(plan.get("completed_words") or [])
+        review_quota = int(plan.get("review_quota", plan.get("review_target", len(review_words))))
+        new_quota = int(plan.get("new_quota", plan.get("new_target", len(new_words))))
+        planned_count = int(
+            plan.get("planned_count", len(planned_words))
+        ) or (len(review_words) + len(new_words))
+        review_completed, review_scheduled, new_completed, new_scheduled = (
+            self._daily_segment_progress(plan)
+        )
         completed = len(completed_set)
-        remaining = max(0, target - completed)
-        review_completed = sum(1 for w in review_words if w in completed_set)
-        new_completed = sum(1 for w in new_words if w in completed_set)
-        review_quota = int(plan.get("review_target", len(review_words)))
-        new_quota = int(plan.get("new_target", len(new_words)))
-        review_remaining = max(0, review_quota - review_completed)
-        new_remaining = max(0, new_quota - new_completed)
+        review_remaining = max(0, review_scheduled - review_completed)
+        new_remaining = max(0, new_scheduled - new_completed)
+        remaining = sum(1 for w in planned_words if w not in completed_set)
+        target = completed + remaining
+        review_shortfall = int(
+            plan.get("review_shortfall", max(0, review_quota - review_scheduled))
+        )
         if review_remaining > 0:
             segment = "review"
         elif new_remaining > 0:
@@ -329,8 +475,12 @@ class DailyProgressStore:
             "target": target,
             "completed": completed,
             "remaining": remaining,
-            "new_target": new_quota,
-            "review_target": review_quota,
+            "new_target": new_scheduled,
+            "review_target": review_scheduled,
+            "new_quota": new_quota,
+            "review_quota": review_quota,
+            "review_shortfall": review_shortfall,
+            "planned_count": planned_count,
             "carryover_review_pending": len(bucket.get("carryover_review_words") or []),
             "carryover_new_pending": len(bucket.get("carryover_new_words") or []),
             "new_completed": new_completed,
@@ -352,6 +502,7 @@ def build_daily_plan_segments(
     carryover_review_words: list[str] | None = None,
     carryover_new_words: list[str] | None = None,
     carryover_words: list[str] | None = None,
+    exclude_words: list[str] | None = None,
     seed: int | None = None,
 ) -> dict[str, Any]:
     """
@@ -360,7 +511,9 @@ def build_daily_plan_segments(
     """
     rng = random.Random(seed)
     word_set = set(all_entry_words)
-    seen: set[str] = set()
+    seen: set[str] = {
+        str(w).casefold() for w in (exclude_words or []) if str(w).strip()
+    }
     new_quota = max(0, int(new_target))
     review_quota = max(0, int(review_target))
 
@@ -406,11 +559,13 @@ def build_daily_plan_segments(
         add_word(new_list, w, new_quota)
 
     planned = review_list + new_list
+    scheduled = len(planned)
     return {
         "review_words": review_list,
         "new_words": new_list,
         "planned_words": planned,
-        "target": len(planned),
+        "target": scheduled,
+        "planned_count": scheduled,
         "new_target": new_quota,
         "review_target": review_quota,
     }

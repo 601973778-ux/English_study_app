@@ -1,30 +1,70 @@
 # Spoken dialogue module
 
-Modular spoken English practice: **script fast path** for chitchat/control/simple slots, **RAG + LLM** for open dialogue. LLM is stubbed until DeepSeek local deployment.
+Modular spoken English practice: **script fast path** for chitchat/control/simple slots, **RAG + DeepSeek LLM** for open dialogue.
 
 ## Layout
 
 ```
 Spoken_model/dialogue/
+  config/          # llm_defaults.json
   contracts/       # types + adapter/scenario protocols
   core/            # pipeline, session store, registry, DialogueService
   engines/         # ScriptEngine, RagLlmEngine
   adapters/        # ASR/TTS/LLM/RAG wrappers
   evaluation/      # cycle rule evaluator
   scenarios/       # JSON scenario packs (default + restaurant_order)
-  user_data/       # persisted sessions (gitignored)
+  user_data/       # sessions + llm_settings.json (gitignored)
 ```
 
 ## Turn pipeline
 
 ```
-user text (or ASR later) → normalize → classify route
+user text → normalize → classify route
   → script engine (control/chitchat/topic/redirect)
-  → else RAG retrieve → StubLlm or template reply
+  → else RAG retrieve → DeepSeek chat (or template if LLM off)
   → update session / stage → TTS URL → cycle counter (10 turns)
 ```
 
-## API (via `app/server.py`)
+## DeepSeek LLM 配置
+
+支持 **DeepSeek 官方 API** 与 **本地 OpenAI 兼容服务**（Ollama / vLLM / LM Studio）。
+
+### 方式一：环境变量
+
+```bash
+set DIALOGUE_LLM_ENABLED=true
+set DEEPSEEK_API_KEY=sk-...
+# 本地部署示例：
+# set DEEPSEEK_BASE_URL=http://127.0.0.1:11434/v1
+# set DEEPSEEK_MODEL=deepseek-r1:7b
+```
+
+### 方式二：配置文件
+
+写入 `Spoken_model/dialogue/user_data/llm_settings.json`（或通过 API）：
+
+```json
+{
+  "enabled": true,
+  "base_url": "https://api.deepseek.com/v1",
+  "model": "deepseek-chat",
+  "api_key": "sk-...",
+  "max_tokens": 256,
+  "temperature": 0.7,
+  "rag_min_score": 0.15
+}
+```
+
+本地无 API Key 时，只要 `base_url` 为 `localhost` / `127.0.0.1` 也可启用。
+
+### HTTP API
+
+| Method | Path | 说明 |
+|--------|------|------|
+| GET | `/api/dialogue/llm-config` | 查看配置（密钥脱敏） |
+| POST | `/api/dialogue/llm-config` | 保存配置并热重载 LLM |
+
+## Dialogue API
 
 | Method | Path | Body / query |
 |--------|------|----------------|
@@ -37,17 +77,11 @@ user text (or ASR later) → normalize → classify route
 
 TTS: responses include `tts_url` → existing `GET /api/tts?text=...`.
 
-## Dev test (text only)
-
-```bash
-# from repo root
-python -m Spoken_model.dialogue.cli_text_test
-```
-
-Requires RAG index built once:
+## Dev test
 
 ```bash
 python -m Spoken_model.rag.build_kb
+python -m Spoken_model.dialogue.cli_text_test
 ```
 
 ## Add a scenario
@@ -59,4 +93,3 @@ python -m Spoken_model.rag.build_kb
 ## Later hooks
 
 - **ASR**: implement `AsrAdapter` (e.g. Xfyun IAT), pass `audio_b64` in `/api/dialogue/turn`.
-- **LLM**: replace `StubLlm` with `DeepSeekLlm` in `DialogueService` when local DeepSeek is ready; set `llm_enabled=True`.

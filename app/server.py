@@ -54,10 +54,20 @@ from Vocabulary_model.daily_session_service import (  # noqa: E402
     _merge_progress,
     idle_progress_state,
     on_session_action,
+    save_user_settings_with_plan,
+    settings_api_payload,
     start_or_resume,
 )
+from Vocabulary_model.reinforce_quiz.service import (  # noqa: E402
+    clear_pending_for_word,
+    generate_quiz,
+    grade_quiz,
+)
 from Spoken_model.dialogue.contracts.types import TurnRequest  # noqa: E402
-from Spoken_model.dialogue.core.dialogue_service import get_dialogue_service  # noqa: E402
+from Spoken_model.dialogue.core.dialogue_service import get_dialogue_service, reset_dialogue_service  # noqa: E402
+from Spoken_model.dialogue.adapters.deepseek_llm import DeepSeekLlmError  # noqa: E402
+from Spoken_model.dialogue.adapters.audio_converter import XfyunAsrError  # noqa: E402
+from Spoken_model.dialogue.llm_settings import get_llm_config_public, save_llm_settings  # noqa: E402
 
 DEFAULT_PORT = 8766
 
@@ -162,6 +172,13 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             return idle_progress_state(len(entries), wid, label)
         return _merge_progress(_SESSION.state(), _DAILY_STORE.progress_payload(wid))
 
+    def _entry_for_word(self, word: str, entries: list) -> Any:
+        target = str(word or "").strip().casefold()
+        for e in entries:
+            if str(getattr(e, "word", "")).strip().casefold() == target:
+                return e
+        raise ValueError(f"词库中未找到单词：{word}")
+
     def _persist_session_words(self, *, graduated_word: str | None = None) -> None:
         if _SESSION is None:
             return
@@ -186,7 +203,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         if req_path.startswith("/api/settings"):
             try:
                 s = load_user_settings()
-                out = dict(s)
+                out = settings_api_payload(s, _DAILY_STORE)
                 out["wordbook_label"] = wordbook_label(str(s.get("wordbook_id", "cet6")))
                 self._send_json(out)
             except Exception as e:  # noqa: BLE001
@@ -284,6 +301,12 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             except Exception as e:  # noqa: BLE001
                 self._send_json({"error": str(e)}, status=500)
             return
+        if req_path.startswith("/api/dialogue/llm-config"):
+            try:
+                self._send_json(get_llm_config_public())
+            except Exception as e:  # noqa: BLE001
+                self._send_json({"error": str(e)}, status=500)
+            return
         return super().do_GET()
 
     def do_POST(self) -> None:
@@ -329,18 +352,22 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
             if req_path == "/api/settings":
                 prev = load_user_settings()
                 prev_wb = str(prev.get("wordbook_id", "cet6"))
-                settings = save_user_settings(payload)
-                if str(settings.get("wordbook_id", "cet6")) != prev_wb:
+                status, body = save_user_settings_with_plan(
+                    _DAILY_STORE,
+                    payload,
+                    review_store=_REVIEW_STORE,
+                    get_entries=_ensure_entries,
+                )
+                new_wb = str(body.get("wordbook_id", prev_wb))
+                if new_wb != prev_wb:
                     invalidate_entries()
                     invalidate_similar_cache(prev_wb)
-                    invalidate_similar_cache(str(settings.get("wordbook_id", "cet6")))
+                    invalidate_similar_cache(new_wb)
                     _SESSION = None
-                self._send_json(
-                    {
-                        **settings,
-                        "wordbook_label": wordbook_label(str(settings.get("wordbook_id", "cet6"))),
-                    }
-                )
+                elif body.get("session_cleared"):
+                    _SESSION = None
+                body["wordbook_label"] = wordbook_label(new_wb)
+                self._send_json(body, status=status)
                 return
             if req_path == "/api/dialogue/start":
                 scenario_id = str(payload.get("scenario_id") or "restaurant_order").strip()
@@ -356,9 +383,25 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                     session_id=session_id,
                     user_text=payload.get("user_text"),
                     audio_b64=payload.get("audio_b64"),
+                    audio_format=str(payload.get("audio_format") or "pcm_s16le"),
+                    language=str(payload.get("language") or "en"),
                 )
                 svc = get_dialogue_service()
-                self._send_json(svc.turn(req).to_dict())
+                try:
+                    self._send_json(svc.turn(req).to_dict())
+                except XfyunAsrError as e:
+                    self._send_json({"error": str(e)}, status=502)
+                except DeepSeekLlmError as e:
+                    self._send_json({"error": str(e)}, status=502)
+                except ValueError as e:
+                    self._send_json({"error": str(e)}, status=400)
+                return
+            if req_path == "/api/dialogue/llm-config":
+                try:
+                    self._send_json(save_llm_settings(payload))
+                    reset_dialogue_service()
+                except ValueError as e:
+                    self._send_json({"error": str(e)}, status=400)
                 return
             if req_path == "/api/dialogue/continue":
                 session_id = str(payload.get("session_id") or "").strip()
@@ -391,9 +434,47 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 self._send_json(on_session_action(_DAILY_STORE, wid, _SESSION))
                 return
             if req_path == "/api/mistake":
+                if _SESSION.current:
+                    clear_pending_for_word(_SESSION.current.word)
                 _SESSION.mistake_after_known()
                 self._persist_session_words()
                 self._send_json(on_session_action(_DAILY_STORE, wid, _SESSION))
+                return
+            if req_path == "/api/quiz/generate":
+                ctx = _SESSION.quiz_context()
+                if not ctx:
+                    self._send_json({"error": "当前不在巩固测验阶段"}, status=400)
+                    return
+                _, _, entries = self._wordbook_context()
+                entry = self._entry_for_word(ctx["word"], entries)
+                quiz = generate_quiz(
+                    entry=entry,
+                    stage=int(ctx["stage"]),
+                    variant=int(ctx["variant"]),
+                    entries=entries,
+                    wordbook_id=wid,
+                )
+                body = on_session_action(_DAILY_STORE, wid, _SESSION)
+                body["quiz"] = quiz
+                self._send_json(body)
+                return
+            if req_path == "/api/quiz/submit":
+                quiz_id = str(payload.get("quiz_id") or "").strip()
+                if not quiz_id:
+                    self._send_json({"error": "missing quiz_id"}, status=400)
+                    return
+                try:
+                    result = grade_quiz(quiz_id=quiz_id, answer=payload.get("answer"))
+                except ValueError as e:
+                    self._send_json({"error": str(e)}, status=400)
+                    return
+                done = _SESSION.apply_quiz_result(str(result.get("word") or ""), result)
+                self._persist_session_words(graduated_word=done)
+                body = on_session_action(
+                    _DAILY_STORE, wid, _SESSION, just_completed_word=done
+                )
+                body["quizResult"] = result
+                self._send_json(body)
                 return
             if req_path == "/api/next":
                 done = _SESSION.peek_word_completed_on_next()

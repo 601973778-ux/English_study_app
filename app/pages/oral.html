@@ -20,14 +20,19 @@
     <div class="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
       <div class="px-6 py-4 border-b bg-blue-50">
         <h1 class="text-xl font-bold text-gray-800">餐厅点餐对话</h1>
-        <p class="text-sm text-gray-500 mt-1">文本输入联调；语音识别后续接入 ASR。</p>
+        <p class="text-sm text-gray-500 mt-1">按住麦克风说话，或输入英文文本；识别走讯飞语音听写（IAT）。</p>
       </div>
       <div id="log" class="p-4 h-80 overflow-y-auto space-y-3 bg-gray-50 text-sm"></div>
-      <div class="p-4 border-t flex gap-2">
-        <input id="input" type="text" placeholder="English only for now, e.g. Table for two"
+      <div class="p-4 border-t flex gap-2 items-center">
+        <button id="micBtn" type="button" title="按住说话"
+                class="shrink-0 w-11 h-11 rounded-full bg-red-500 text-white flex items-center justify-center select-none touch-none">
+          <iconify-icon icon="ph:microphone-bold" width="22"></iconify-icon>
+        </button>
+        <input id="input" type="text" placeholder="English only, e.g. Table for two"
                class="flex-1 border rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400" />
         <button id="sendBtn" class="px-4 py-2 bg-blue-600 text-white text-sm font-bold rounded-lg">发送</button>
       </div>
+      <p id="asrHint" class="px-4 pb-3 text-xs text-gray-400 hidden">正在识别…</p>
       <div id="evalPanel" class="hidden p-4 border-t bg-amber-50 text-sm">
         <p class="font-semibold mb-2">本轮练习完成</p>
         <pre id="evalText" class="text-xs whitespace-pre-wrap text-gray-700 mb-3"></pre>
@@ -41,10 +46,19 @@
 <script>
 const logEl = document.getElementById('log');
 const inputEl = document.getElementById('input');
+const micBtn = document.getElementById('micBtn');
+const asrHint = document.getElementById('asrHint');
 const cycleBadge = document.getElementById('cycleBadge');
 const evalPanel = document.getElementById('evalPanel');
 const evalText = document.getElementById('evalText');
 let sessionId = null;
+let micStream = null;
+let micCtx = null;
+let micSource = null;
+let micProcessor = null;
+let pcmChunks = [];
+let recording = false;
+const TARGET_RATE = 16000;
 
 function append(role, text, extra) {
   const div = document.createElement('div');
@@ -86,16 +100,15 @@ function updateBadge(count, size, cycle) {
   cycleBadge.textContent = `第 ${cycle} 轮 · ${count}/${size}`;
 }
 
-async function sendTurn() {
-  const text = inputEl.value.trim();
-  if (!text || !sessionId) return;
-  inputEl.value = '';
-  append('user', text);
+async function sendTurnPayload(body) {
   const data = await api('/api/dialogue/turn', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ session_id: sessionId, user_text: text })
+    body: JSON.stringify(body)
   });
+  if (data.user_text) {
+    append('user', data.user_text, '语音识别');
+  }
   append('waiter', data.waiter_reply, data.route);
   playTts(data.tts_url);
   updateBadge(data.user_count_in_cycle, 10, data.cycle_index);
@@ -106,8 +119,125 @@ async function sendTurn() {
   }
 }
 
+async function sendTurn() {
+  const text = inputEl.value.trim();
+  if (!text || !sessionId) return;
+  inputEl.value = '';
+  append('user', text);
+  await sendTurnPayload({ session_id: sessionId, user_text: text });
+}
+
+function downsampleBuffer(buffer, sampleRate, outRate) {
+  if (outRate === sampleRate) return buffer;
+  const ratio = sampleRate / outRate;
+  const newLength = Math.round(buffer.length / ratio);
+  const result = new Float32Array(newLength);
+  for (let i = 0; i < newLength; i++) {
+    result[i] = buffer[Math.min(buffer.length - 1, Math.floor(i * ratio))];
+  }
+  return result;
+}
+
+function floatTo16BitPCM(float32Array) {
+  const buffer = new ArrayBuffer(float32Array.length * 2);
+  const view = new DataView(buffer);
+  for (let i = 0; i < float32Array.length; i++) {
+    const s = Math.max(-1, Math.min(1, float32Array[i]));
+    view.setInt16(i * 2, s < 0 ? s * 0x8000 : s * 0x7fff, true);
+  }
+  return new Uint8Array(buffer);
+}
+
+function mergePcmChunks(chunks) {
+  let total = 0;
+  for (const c of chunks) total += c.length;
+  const out = new Uint8Array(total);
+  let offset = 0;
+  for (const c of chunks) {
+    out.set(c, offset);
+    offset += c.length;
+  }
+  return out;
+}
+
+function arrayBufferToBase64(bytes) {
+  let binary = '';
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    binary += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(binary);
+}
+
+async function ensureMic() {
+  if (micStream) return;
+  micStream = await navigator.mediaDevices.getUserMedia({ audio: true, video: false });
+  micCtx = new AudioContext();
+  micSource = micCtx.createMediaStreamSource(micStream);
+  micProcessor = micCtx.createScriptProcessor(4096, 1, 1);
+  micProcessor.onaudioprocess = (e) => {
+    if (!recording) return;
+    const input = e.inputBuffer.getChannelData(0);
+    const down = downsampleBuffer(input, micCtx.sampleRate, TARGET_RATE);
+    pcmChunks.push(floatTo16BitPCM(down));
+  };
+  micSource.connect(micProcessor);
+  micProcessor.connect(micCtx.destination);
+}
+
+async function startRecording() {
+  if (!sessionId || recording) return;
+  try {
+    await ensureMic();
+    pcmChunks = [];
+    recording = true;
+    micBtn.classList.replace('bg-red-500', 'bg-red-700');
+    asrHint.classList.remove('hidden');
+    asrHint.textContent = '正在录音…松开发送';
+  } catch (err) {
+    append('waiter', '无法访问麦克风: ' + err.message);
+  }
+}
+
+async function stopRecording() {
+  if (!recording) return;
+  recording = false;
+  micBtn.classList.replace('bg-red-700', 'bg-red-500');
+  asrHint.textContent = '正在识别…';
+  const pcm = mergePcmChunks(pcmChunks);
+  pcmChunks = [];
+  if (!pcm.length || !sessionId) {
+    asrHint.classList.add('hidden');
+    return;
+  }
+  try {
+    await sendTurnPayload({
+      session_id: sessionId,
+      audio_b64: arrayBufferToBase64(pcm),
+      audio_format: 'pcm_s16le',
+      language: 'en'
+    });
+  } catch (err) {
+    append('waiter', '语音识别失败: ' + err.message);
+  } finally {
+    asrHint.classList.add('hidden');
+  }
+}
+
+function bindMicHold(el) {
+  const start = (e) => { e.preventDefault(); startRecording(); };
+  const stop = (e) => { e.preventDefault(); stopRecording(); };
+  el.addEventListener('mousedown', start);
+  el.addEventListener('mouseup', stop);
+  el.addEventListener('mouseleave', stop);
+  el.addEventListener('touchstart', start, { passive: false });
+  el.addEventListener('touchend', stop, { passive: false });
+  el.addEventListener('touchcancel', stop, { passive: false });
+}
+
 document.getElementById('sendBtn').addEventListener('click', sendTurn);
 inputEl.addEventListener('keydown', e => { if (e.key === 'Enter') sendTurn(); });
+bindMicHold(micBtn);
 document.getElementById('continueBtn').addEventListener('click', async () => {
   await api('/api/dialogue/continue', {
     method: 'POST',

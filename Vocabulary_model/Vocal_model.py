@@ -143,7 +143,7 @@ def synthesize_english_word(
     word = (text or "").strip()
     if not word:
         raise XfyunTtsError("empty text")
-    if len(word) > 64:
+    if len(word) > 300:
         raise XfyunTtsError("text too long")
 
     creds = load_xfyun_credentials()

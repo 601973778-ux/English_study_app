@@ -13,17 +13,53 @@
     "next_stage": "ORDERING"
   },
   {
+    "id": "drink",
+    "patterns": [
+      "i'd like", "i would like", "can i have", "i'll have", "give me", "order",
+      "water", "wine", "beer", "coffee", "tea", "juice", "soda", "cola",
+      "lemonade", "milk", "cocktail", "whiskey", "whisky", "champagne",
+      "espresso", "latte", "cappuccino", "mocha", "smoothie", "sparkling",
+      "mineral", "soft drink", "orange juice", "apple juice", "iced tea",
+      "hot chocolate", "cider", "ale", "lager", "stout", "red wine", "white wine"
+    ],
+    "requires_any": [
+      "water", "wine", "beer", "coffee", "tea", "juice", "soda", "cola",
+      "lemonade", "milk", "cocktail", "whiskey", "whisky", "champagne",
+      "espresso", "latte", "cappuccino", "mocha", "smoothie", "sparkling",
+      "mineral", "cider", "ale", "lager", "stout", "drink", "beverage"
+    ],
+    "reply": "Sure, I'll bring that right away. Anything else for you?",
+    "next_stage": "ORDERING"
+  },
+  {
     "id": "order_food",
-    "patterns": ["i'd like", "i would like", "can i have", "i'll have", "order"],
+    "patterns": [
+      "i'd like", "i would like", "can i have", "i'll have", "give me", "order",
+      "steak", "salmon", "chicken", "pasta", "burger", "pizza", "salad",
+      "soup", "rice", "noodles", "sandwich", "fish", "lamb", "pork", "shrimp",
+      "dessert", "cake", "pie", "appetizer", "starter", "bread", "fries",
+      "chips", "egg", "toast", "lobster", "tuna", "sushi", "curry", "tacos",
+      "wrap", "special", "vegetarian", "vegan", "grilled", "roast", "fried",
+      "noodle", "dumpling", "steak", "rib", "wings", "mushroom", "vegetables"
+    ],
+    "requires_any": [
+      "steak", "salmon", "chicken", "pasta", "burger", "pizza", "salad",
+      "soup", "rice", "noodles", "noodle", "sandwich", "fish", "lamb", "pork",
+      "shrimp", "dessert", "cake", "pie", "appetizer", "starter", "bread",
+      "fries", "chips", "egg", "toast", "lobster", "tuna", "sushi", "curry",
+      "tacos", "wrap", "special", "vegetarian", "vegan", "grilled", "roast",
+      "fried", "dumpling", "rib", "wings", "mushroom", "vegetables", "veggie",
+      "main", "course", "entree", "entrée"
+    ],
+    "excludes_any": [
+      "water", "wine", "beer", "coffee", "tea", "juice", "soda", "cola",
+      "lemonade", "milk", "cocktail", "whiskey", "whisky", "champagne",
+      "espresso", "latte", "cappuccino", "mocha", "smoothie", "cider",
+      "ale", "lager", "stout", "drink", "beverage"
+    ],
     "reply": "Great choice. Would you like anything to drink with that?",
     "next_stage": "ORDERING",
     "set_slots": {"ordered": true}
-  },
-  {
-    "id": "drink",
-    "patterns": ["water", "wine", "beer", "coffee", "juice", "drink"],
-    "reply": "I'll bring that right away. Anything else for you?",
-    "next_stage": "ORDERING"
   },
   {
     "id": "bill",

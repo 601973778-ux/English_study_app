@@ -92,3 +92,11 @@ def save_user_settings(raw: Any) -> dict[str, Any]:
     SETTINGS_FILE.write_text(json.dumps(settings, ensure_ascii=False, indent=2), encoding="utf-8")
     return settings
 
+
+def merge_user_settings(raw: Any) -> dict[str, Any]:
+    """合并并规范化设置，但不写入磁盘（用于保存前校验）。"""
+    prev = load_user_settings()
+    if not isinstance(raw, dict):
+        raw = {}
+    return _normalize_settings({**prev, **raw})
+

@@ -25,11 +25,14 @@ class TurnPipeline:
         retriever: KnowledgeRetriever,
         llm: LlmAdapter | None,
         llm_enabled: bool = True,
+        rag_min_score: float = 0.0,
     ) -> None:
         self._asr = asr
         self._tts = tts
         self._script = ScriptEngine()
-        self._rag = RagLlmEngine(retriever, llm, llm_enabled=llm_enabled)
+        self._rag = RagLlmEngine(
+            retriever, llm, llm_enabled=llm_enabled, rag_min_score=rag_min_score
+        )
 
     def resolve_user_text(self, req: TurnRequest) -> str:
         text = normalize_user_text(req.user_text or "")
@@ -37,7 +40,11 @@ class TurnPipeline:
             return text
         if req.audio_b64:
             audio = base64.b64decode(req.audio_b64)
-            return normalize_user_text(self._asr.transcribe(audio))
+            lang = (req.language or "en").strip()
+            fmt = (req.audio_format or "pcm_s16le").strip()
+            return normalize_user_text(
+                self._asr.transcribe(audio, language=lang, audio_format=fmt)
+            )
         return ""
 
     def run_turn(
@@ -72,6 +79,7 @@ class TurnPipeline:
         return TurnResult(
             session_id=session.session_id,
             scenario_id=session.scenario_id,
+            user_text=user_text,
             waiter_reply=reply,
             route=route,
             stage=session.stage,

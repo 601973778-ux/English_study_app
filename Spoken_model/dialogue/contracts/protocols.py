@@ -36,7 +36,13 @@ class ScenarioPlugin(Protocol):
 
 @runtime_checkable
 class AsrAdapter(Protocol):
-    def transcribe(self, audio: bytes, *, language: str = "en") -> str: ...
+    def transcribe(
+        self,
+        audio: bytes,
+        *,
+        language: str = "en",
+        audio_format: str | None = "pcm_s16le",
+    ) -> str: ...
 
 
 @runtime_checkable

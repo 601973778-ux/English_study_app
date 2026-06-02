@@ -1,0 +1,4 @@
+{
+  "scenario_tags": ["restaurant", "ordering", "dining", "eating_out", "reservation"],
+  "chunk_types": ["dialogue_turn", "useful_expression"]
+}

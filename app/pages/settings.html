@@ -6,7 +6,21 @@
 <title>用户学习设置 · 单词学习</title>
 <script src="https://modao.cc/agent-py/static/source/js/tailwindcss.3.4.3.js"></script>
 <script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.1.0.7.js"></script>
-<style>body { background: #F4F4F4; font-family: system-ui, sans-serif; }</style>
+<style>
+  body { background: #F4F4F4; font-family: system-ui, sans-serif; }
+  #confirmModal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 9999;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.45);
+    padding: 1rem;
+  }
+  #confirmModal.open { display: flex; }
+  #saveBtn:disabled { opacity: 0.55; cursor: not-allowed; }
+</style>
 </head>
 <body class="min-h-screen p-8">
   <div class="max-w-lg mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-8">
@@ -40,7 +54,7 @@
       </label>
     </div>
     <div class="flex gap-3 mt-8">
-      <button type="button" id="saveBtn" class="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">保存</button>
+      <button type="button" id="saveBtn" class="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500" disabled>加载中…</button>
       <a href="/app/pages/api-config.html" class="px-5 py-2.5 rounded-lg border border-gray-300 text-sm inline-flex items-center gap-1 hover:bg-gray-50">
         <iconify-icon icon="ph:plugs-connected-bold"></iconify-icon> API 接入配置
       </a>
@@ -49,20 +63,149 @@
       </a>
     </div>
     <p id="msg" class="text-sm mt-4 text-gray-600"></p>
+    <p id="planHint" class="text-xs mt-2 text-amber-700 hidden"></p>
   </div>
+
+  <div id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="w-full max-w-md rounded-xl bg-white p-6 shadow-xl border border-gray-200">
+      <h2 id="confirmTitle" class="text-lg font-semibold text-gray-900 mb-2 flex items-center gap-2">
+        <iconify-icon icon="ph:warning-circle-bold" class="text-amber-500 text-xl"></iconify-icon>
+        确认保存设置
+      </h2>
+      <p id="confirmText" class="text-sm text-gray-600 leading-relaxed mb-6">
+        更改设置后，今日未完成计划将立刻发生改动。是否确定保存？
+      </p>
+      <div class="flex justify-end gap-3">
+        <button type="button" id="confirmCancelBtn" class="px-4 py-2 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50">取消</button>
+        <button type="button" id="confirmOkBtn" class="px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-semibold hover:bg-blue-500">确定保存</button>
+      </div>
+    </div>
+  </div>
+
   <script>
+    const CONFIRM_MESSAGE = "更改设置后，今日未完成计划将立刻发生改动。是否确定保存？";
+    const CONFIRM_MESSAGE_COMPLETED = "今日计划已完成。保存后新设置将于明天自动生效（今日已完成进度不变）。是否确定保存？";
+    let loadedSettings = null;
+    let pendingPayload = null;
+    const saveBtn = document.getElementById("saveBtn");
+    const planHint = document.getElementById("planHint");
+    const confirmModal = document.getElementById("confirmModal");
+
     async function apiGet(path) {
       const res = await fetch(path);
       const data = await res.json().catch(() => ({}));
       if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
       return data;
     }
-    async function apiPost(path, body) {
-      const res = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+
+    async function apiPostSettings(body) {
+      const res = await fetch("/api/settings", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body || {}),
+      });
       const data = await res.json().catch(() => ({}));
-      if (!res.ok) throw new Error(data.error || `HTTP ${res.status}`);
+      if (!res.ok) {
+        const err = new Error(data.confirm_message || data.error || `HTTP ${res.status}`);
+        err.status = res.status;
+        err.data = data;
+        throw err;
+      }
       return data;
     }
+
+    function collectPayload() {
+      const n = Number(document.getElementById("dailyWords").value);
+      if (!Number.isFinite(n) || n < 1 || n > 500) {
+        throw new Error("请输入 1–500 的整数。");
+      }
+      return {
+        wordbook_id: document.getElementById("wordbook").value,
+        daily_words: Math.floor(n),
+        review_ratio: document.getElementById("reviewRatio").value,
+        similar_words_auto_load: document.getElementById("similarWordsAutoLoad").checked,
+      };
+    }
+
+    function affectsTodayPlan(loaded, payload) {
+      if (!loaded) return false;
+      return String(loaded.daily_words) !== String(payload.daily_words)
+        || String(loaded.review_ratio) !== String(payload.review_ratio)
+        || String(loaded.wordbook_id || "") !== String(payload.wordbook_id || "");
+    }
+
+    function planStatus(loaded) {
+      if (!loaded) return "none";
+      if (loaded.today_plan_status) return String(loaded.today_plan_status);
+      if (loaded.today_plan_in_progress) return "in_progress";
+      if (loaded.today_plan_completed) return "completed";
+      return "none";
+    }
+
+    function needsConfirmDialog(loaded, payload) {
+      if (!affectsTodayPlan(loaded, payload)) return false;
+      const st = planStatus(loaded);
+      return st === "in_progress" || st === "completed";
+    }
+
+    function confirmMessageFor(loaded, errData) {
+      if (errData && errData.confirm_message) return errData.confirm_message;
+      if (errData && errData.confirm_mode === "tomorrow") return CONFIRM_MESSAGE_COMPLETED;
+      if (planStatus(loaded) === "completed") return CONFIRM_MESSAGE_COMPLETED;
+      return CONFIRM_MESSAGE;
+    }
+
+    function showConfirmModal(message) {
+      document.getElementById("confirmText").textContent = message || CONFIRM_MESSAGE;
+      confirmModal.classList.add("open");
+    }
+
+    function hideConfirmModal() {
+      confirmModal.classList.remove("open");
+      pendingPayload = null;
+    }
+
+    function updatePlanHint() {
+      if (!loadedSettings) {
+        planHint.classList.add("hidden");
+        planHint.textContent = "";
+        return;
+      }
+      const st = planStatus(loadedSettings);
+      const done = loadedSettings.today_completed ?? 0;
+      const left = loadedSettings.today_remaining ?? 0;
+      const target = loadedSettings.today_target ?? 0;
+      if (st === "in_progress") {
+        planHint.textContent = `今日计划进行中（已完成 ${done}，剩余 ${left}）。修改词书/每日词数/复习比例并重排后，未完成词将按新设置重新安排。`;
+        planHint.classList.remove("hidden");
+        return;
+      }
+      if (st === "completed") {
+        planHint.textContent = `今日计划已完成（${done}/${target}）。修改词书/每日词数/复习比例时须确认保存，新设置将于明天生效。`;
+        planHint.classList.remove("hidden");
+        return;
+      }
+      planHint.classList.add("hidden");
+      planHint.textContent = "";
+    }
+
+    async function performSave(payload, msgEl) {
+      const saved = await apiPostSettings(payload);
+      loadedSettings = saved;
+      updatePlanHint();
+      let text = "已保存。";
+      if (saved.session_cleared) {
+        text += " 今日计划已按新设置重排，请返回背诵页点击「继续学习」。";
+      } else if (saved.settings_apply_when === "tomorrow") {
+        text += " 今日已完成，新设置将于明天生效。";
+      }
+      msgEl.textContent = text;
+    }
+
+    function isConfirmRequiredError(err) {
+      return err && err.status === 409 && err.data && err.data.requires_confirm;
+    }
+
     (async function () {
       try {
         const wb = await apiGet("/api/wordbooks");
@@ -75,32 +218,75 @@
           opt.disabled = !it.available;
           sel.appendChild(opt);
         });
-        const s = await apiGet("/api/settings");
-        document.getElementById("dailyWords").value = String(s.daily_words);
-        document.getElementById("reviewRatio").value = s.review_ratio;
-        document.getElementById("similarWordsAutoLoad").checked = !!s.similar_words_auto_load;
-        if (s.wordbook_id) sel.value = String(s.wordbook_id);
+        loadedSettings = await apiGet("/api/settings");
+        document.getElementById("dailyWords").value = String(loadedSettings.daily_words);
+        document.getElementById("reviewRatio").value = loadedSettings.review_ratio;
+        document.getElementById("similarWordsAutoLoad").checked = !!loadedSettings.similar_words_auto_load;
+        if (loadedSettings.wordbook_id) sel.value = String(loadedSettings.wordbook_id);
+        updatePlanHint();
+        saveBtn.disabled = false;
+        saveBtn.textContent = "保存";
       } catch (e) {
         document.getElementById("msg").textContent = "加载失败：" + e.message;
+        saveBtn.disabled = true;
+        saveBtn.textContent = "无法保存";
       }
     })();
-    document.getElementById("saveBtn").addEventListener("click", async () => {
+
+    document.getElementById("confirmCancelBtn").addEventListener("click", () => {
+      hideConfirmModal();
+      document.getElementById("msg").textContent = "已取消保存，设置未改动。";
+    });
+
+    document.getElementById("confirmOkBtn").addEventListener("click", async () => {
       const msg = document.getElementById("msg");
-      const n = Number(document.getElementById("dailyWords").value);
-      if (!Number.isFinite(n) || n < 1 || n > 500) {
-        msg.textContent = "请输入 1–500 的整数。";
+      if (!pendingPayload) {
+        hideConfirmModal();
         return;
       }
+      const payload = { ...pendingPayload, confirm_rebuild: true };
+      hideConfirmModal();
+      saveBtn.disabled = true;
       try {
-        await apiPost("/api/settings", {
-          wordbook_id: document.getElementById("wordbook").value,
-          daily_words: Math.floor(n),
-          review_ratio: document.getElementById("reviewRatio").value,
-          similar_words_auto_load: document.getElementById("similarWordsAutoLoad").checked,
-        });
-        msg.textContent = "已保存。";
+        await performSave(payload, msg);
       } catch (e) {
         msg.textContent = "保存失败：" + e.message;
+      } finally {
+        saveBtn.disabled = false;
+      }
+    });
+
+    saveBtn.addEventListener("click", async () => {
+      const msg = document.getElementById("msg");
+      msg.textContent = "";
+      if (!loadedSettings) {
+        msg.textContent = "设置尚未加载完成，请稍候。";
+        return;
+      }
+      let payload;
+      try {
+        payload = collectPayload();
+      } catch (e) {
+        msg.textContent = e.message;
+        return;
+      }
+      if (needsConfirmDialog(loadedSettings, payload)) {
+        pendingPayload = payload;
+        showConfirmModal(confirmMessageFor(loadedSettings));
+        return;
+      }
+      saveBtn.disabled = true;
+      try {
+        await performSave(payload, msg);
+      } catch (e) {
+        if (isConfirmRequiredError(e)) {
+          pendingPayload = payload;
+          showConfirmModal(confirmMessageFor(loadedSettings, e.data));
+          return;
+        }
+        msg.textContent = "保存失败：" + e.message;
+      } finally {
+        saveBtn.disabled = false;
       }
     });
   </script>

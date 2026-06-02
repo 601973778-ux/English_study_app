@@ -2,10 +2,10 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from Spoken_model.dialogue.adapters.passthrough_asr import PassthroughAsr
+from Spoken_model.dialogue.adapters.llm_factory import create_llm_adapter
+from Spoken_model.dialogue.adapters.asr_factory import create_asr_adapter
 from Spoken_model.dialogue.adapters.rag_retriever import TfidfKnowledgeRetriever
 from Spoken_model.dialogue.adapters.server_tts import ServerTtsAdapter
-from Spoken_model.dialogue.adapters.stub_llm import StubLlm
 from Spoken_model.dialogue.contracts.types import SessionState, SessionStatus, TurnRequest, TurnResult
 from Spoken_model.dialogue.core.cycle_manager import continue_cycle, end_session
 from Spoken_model.dialogue.core.pipeline import TurnPipeline
@@ -19,16 +19,30 @@ USER_DATA = DIALOGUE_ROOT / "user_data" / "sessions"
 
 
 class DialogueService:
-    def __init__(self, *, llm_enabled: bool = False) -> None:
+    def __init__(self) -> None:
         self._store = SessionStore(USER_DATA)
         self._tts = ServerTtsAdapter()
+        self.reload_llm()
+
+    def reload_llm(self) -> None:
+        llm, llm_enabled, settings = create_llm_adapter()
+        self._llm_settings = settings
         self._pipeline = TurnPipeline(
-            asr=PassthroughAsr(),
+            asr=create_asr_adapter(),
             tts=self._tts,
             retriever=TfidfKnowledgeRetriever(),
-            llm=StubLlm(),
+            llm=llm,
             llm_enabled=llm_enabled,
+            rag_min_score=settings.rag_min_score,
         )
+
+    def llm_status(self) -> dict:
+        return {
+            "enabled": self._llm_settings.enabled,
+            "ready": self._llm_settings.enabled and self._pipeline._rag._llm_enabled,
+            "model": self._llm_settings.model,
+            "base_url": self._llm_settings.base_url,
+        }
 
     def scenarios(self) -> list[dict[str, str]]:
         return list_scenarios()
@@ -41,9 +55,15 @@ class DialogueService:
             cycle_size=plugin.cycle_size,
             default_stage=plugin.default_stage,
         )
-        opening = plugin.opening_line(session)
+        opening, opening_source = self._resolve_opening(plugin, session)
         session.transcript.append(
-            {"user": "", "assistant": opening, "route": "opening", "stage": session.stage}
+            {
+                "user": "",
+                "assistant": opening,
+                "route": "opening",
+                "stage": session.stage,
+                "opening_source": opening_source,
+            }
         )
         self._store.save(session)
         tts_url = self._tts.tts_url_for(opening) or None
@@ -51,10 +71,28 @@ class DialogueService:
             "session_id": session.session_id,
             "scenario_id": session.scenario_id,
             "opening_line": opening,
+            "opening_source": opening_source,
             "stage": session.stage,
             "cycle_size": session.cycle_size,
             "tts_url": tts_url,
         }
+
+    def _resolve_opening(self, plugin: JsonScenarioPlugin, session: SessionState) -> tuple[str, str]:
+        if plugin.opening_mode != "rag_llm":
+            return plugin.opening_line(session), "static"
+        fallback = plugin.opening_fallback_line(session)
+        try:
+            opening, source, _hits = self._pipeline._rag.generate_opening(
+                plugin,
+                session,
+                opening_rag_query=plugin.opening_rag_query(session),
+                opening_rag_filters=plugin.opening_rag_filters(),
+                opening_fallback=fallback,
+                opening_system_prompt=plugin.opening_llm_system_prompt(session),
+            )
+            return opening, source
+        except Exception:
+            return fallback, "fallback"
 
     def turn(self, req: TurnRequest) -> TurnResult:
         session = self._require_session(req.session_id)
@@ -106,5 +144,10 @@ _SERVICE: DialogueService | None = None
 def get_dialogue_service() -> DialogueService:
     global _SERVICE
     if _SERVICE is None:
-        _SERVICE = DialogueService(llm_enabled=False)
+        _SERVICE = DialogueService()
     return _SERVICE
+
+
+def reset_dialogue_service() -> None:
+    global _SERVICE
+    _SERVICE = None

@@ -15,7 +15,7 @@ from Spoken_model.dialogue.core.dialogue_service import DialogueService
 
 
 def main() -> None:
-    svc = DialogueService(llm_enabled=False)
+    svc = DialogueService()
     started = svc.start("restaurant_order")
     session_id = started["session_id"]
     print(f"[waiter] {started['opening_line']}")

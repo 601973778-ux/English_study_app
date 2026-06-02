@@ -19,7 +19,7 @@ import json
 import random
 import re
 from pathlib import Path
-from typing import Iterable, Literal
+from typing import Any, Iterable, Literal
 
 
 DEFAULT_SOURCE = Path(__file__).resolve().parent.parent / "DictionaryByGPT4-main" / "gptwords.json"
@@ -219,14 +219,16 @@ def extract_meaning_only(content: str) -> str:
 
 
 ReviewMode = Literal["", "known", "unknown"]
-REINFORCE_STREAK_REQUIRED = 3
+REINFORCE_STAGE_COUNT = 3
 
 
 class StudySession:
     """
     学习会话（认识/不认识），供 CLI 与 Web 复用。
-    - question 阶段：只显示单词，等待 known/unknown
-    - meaning 阶段：显示词义，等待 next；若是 known，可额外 mistake
+    - 阶段 1：自评（认识/不认识 → 释义 → 下一个/记错了）
+    - 阶段 2：四选一（形近/语义近干扰项）
+    - 阶段 3：例句填空
+    - 不认识/记错：回到阶段 1；词留在当日复习/新学池随机再出现
     """
 
     def __init__(self, entries: list[Entry], count: int, seed: int | None = None) -> None:
@@ -255,9 +257,10 @@ class StudySession:
         self.remembered_words: set[str] = set()
         self.fuzzy_words: set[str] = set()
         self.unknown_words: set[str] = set()
-        self.sequential_order = False
         self.review_word_set: set[str] = set()
-        self.word_streaks: dict[str, int] = {}
+        self.new_word_set: set[str] = set()
+        self.reinforce_stage: dict[str, int] = {}
+        self.mcq_variant: dict[str, int] = {}
         self.word_reinforce: set[str] = set()
 
     @classmethod
@@ -268,6 +271,7 @@ class StudySession:
         planned_words: list[str],
         completed_words: set[str],
         review_words: list[str] | None = None,
+        new_words: list[str] | None = None,
         snapshot: dict | None = None,
     ) -> StudySession:
         by_word = {e.word: e for e in entries}
@@ -277,8 +281,12 @@ class StudySession:
 
         session = cls.__new__(cls)
         session._init_pools(daily_pool, active_pool, completed_words)
-        session.sequential_order = True
         session.review_word_set = {str(w).strip() for w in (review_words or []) if str(w).strip()}
+        session.new_word_set = {str(w).strip() for w in (new_words or []) if str(w).strip()}
+        if not session.new_word_set:
+            session.new_word_set = {
+                w for w in active_set if w not in session.review_word_set
+            }
 
         if snapshot:
             session.review_count = int(snapshot.get("review_count", 0))
@@ -291,11 +299,32 @@ class StudySession:
             session.remembered_words = set(snapshot.get("remembered_words") or [])
             session.fuzzy_words = set(snapshot.get("fuzzy_words") or [])
             session.unknown_words = set(snapshot.get("unknown_words") or [])
-            raw_streaks = snapshot.get("word_streaks") or {}
-            if isinstance(raw_streaks, dict):
-                session.word_streaks = {
-                    str(k): int(v)
-                    for k, v in raw_streaks.items()
+            raw_stages = snapshot.get("reinforce_stage") or {}
+            if isinstance(raw_stages, dict) and raw_stages:
+                session.reinforce_stage = {
+                    str(k): max(1, min(3, int(v)))
+                    for k, v in raw_stages.items()
+                    if str(k).strip()
+                }
+            else:
+                raw_streaks = snapshot.get("word_streaks") or {}
+                if isinstance(raw_streaks, dict):
+                    for k, v in raw_streaks.items():
+                        w = str(k).strip()
+                        if not w:
+                            continue
+                        streak = int(v)
+                        if streak <= 0:
+                            session.reinforce_stage[w] = 1
+                        elif streak == 1:
+                            session.reinforce_stage[w] = 2
+                        else:
+                            session.reinforce_stage[w] = 3
+            raw_variants = snapshot.get("mcq_variant") or {}
+            if isinstance(raw_variants, dict):
+                session.mcq_variant = {
+                    str(k): max(0, int(v))
+                    for k, v in raw_variants.items()
                     if str(k).strip()
                 }
             session.word_reinforce = {
@@ -306,9 +335,9 @@ class StudySession:
             saved_active = snapshot.get("active_words") or []
             if isinstance(saved_active, list) and saved_active:
                 by_w = {e.word: e for e in session.active_pool}
-                ordered = [by_w[w] for w in saved_active if w in by_w]
-                tail = [e for e in session.active_pool if e.word not in {x.word for x in ordered}]
-                session.active_pool = ordered + tail
+                restored = [by_w[w] for w in saved_active if w in by_w]
+                extra = [e for e in session.active_pool if e.word not in {x.word for x in restored}]
+                session.active_pool = restored + extra
             cur = str(snapshot.get("current_word") or "").strip()
             session.current = by_word.get(cur) if cur else None
             if session.current and session.current.word not in active_set:
@@ -325,36 +354,38 @@ class StudySession:
             "fuzzy_words": sorted(self.fuzzy_words),
             "unknown_words": sorted(self.unknown_words),
             "active_words": [e.word for e in self.active_pool],
-            "word_streaks": dict(self.word_streaks),
+            "reinforce_stage": dict(self.reinforce_stage),
+            "mcq_variant": dict(self.mcq_variant),
             "word_reinforce": sorted(self.word_reinforce),
         }
 
-    def _word_progress_payload(self, word: str) -> dict[str, int | bool]:
+    def _reinforce_stage_of(self, word: str) -> int:
+        clean = str(word).strip()
+        if not clean or clean not in self.word_reinforce:
+            return 0
+        return max(1, min(3, int(self.reinforce_stage.get(clean, 1))))
+
+    def _word_progress_payload(self, word: str) -> dict[str, int | bool | str]:
         reinforce = word in self.word_reinforce
-        required = REINFORCE_STREAK_REQUIRED if reinforce else 1
-        streak = int(self.word_streaks.get(word, 0))
+        stage = self._reinforce_stage_of(word) if reinforce else 0
+        labels = {1: "自评", 2: "四选一", 3: "填空"}
         return {
             "reinforce": reinforce,
-            "streak": streak,
-            "required": required,
+            "stage": stage,
+            "required": REINFORCE_STAGE_COUNT,
+            "stage_label": labels.get(stage, ""),
+            "mcq_variant": int(self.mcq_variant.get(word, 0)) if reinforce else 0,
+            "streak": max(0, stage - 1) if reinforce else 0,
         }
 
-    def _mark_reinforce(self, word: str) -> None:
+    def _mark_reinforce(self, word: str, *, reset_variant: bool = True) -> None:
         clean = str(word).strip()
         if not clean:
             return
         self.word_reinforce.add(clean)
-        self.word_streaks[clean] = 0
-
-    def _requeue_to_end(self, word: str) -> None:
-        clean = str(word).strip()
-        if not clean:
-            return
-        entry = next((e for e in self.active_pool if e.word == clean), None)
-        if entry is None:
-            return
-        rest = [e for e in self.active_pool if e.word != clean]
-        self.active_pool = rest + [entry]
+        self.reinforce_stage[clean] = 1
+        if reset_variant:
+            self.mcq_variant[clean] = 0
 
     def _graduate_word(self, word: str) -> None:
         clean = str(word).strip()
@@ -365,16 +396,45 @@ class StudySession:
         self.unknown_words.discard(clean)
         self.completed_words.add(clean)
         self.active_pool = [e for e in self.active_pool if e.word != clean]
-        self.word_streaks.pop(clean, None)
+        self.reinforce_stage.pop(clean, None)
+        self.mcq_variant.pop(clean, None)
         self.word_reinforce.discard(clean)
 
-    def _will_graduate_on_known_next(self, word: str) -> bool:
+    def peek_word_completed_on_next(self) -> str | None:
+        """毕业仅发生在阶段 3 测验通过时，不再通过「下一个」触发。"""
+        return None
+
+    def apply_quiz_result(
+        self, word: str, result: dict[str, Any]
+    ) -> str | None:
+        """应用测验结果；若毕业返回该词。"""
         clean = str(word).strip()
-        if not clean:
-            return False
-        if clean not in self.word_reinforce:
-            return True
-        return self.word_streaks.get(clean, 0) + 1 >= REINFORCE_STREAK_REQUIRED
+        if not clean or clean not in self.word_reinforce:
+            return None
+        if result.get("graduated"):
+            self._graduate_word(clean)
+            self._show_current_word()
+            return clean
+        next_stage = result.get("next_stage")
+        if isinstance(next_stage, int) and 1 <= next_stage <= 3:
+            self.reinforce_stage[clean] = next_stage
+        if result.get("advance_variant"):
+            self.mcq_variant[clean] = int(self.mcq_variant.get(clean, 0)) + 1
+        self.waiting_next_after_meaning = False
+        self.review_mode = ""
+        return None
+
+    def back_to_reinforce_stage1(self) -> None:
+        if not self.current:
+            return
+        word = self.current.word
+        self._mark_reinforce(word, reset_variant=True)
+        self.fuzzy_words.add(word)
+        self.remembered_words.discard(word)
+        self.unknown_words.discard(word)
+        self.waiting_next_after_meaning = False
+        self.review_mode = ""
+        self._show_current_word()
 
     def _meta_text(self) -> str:
         return (
@@ -383,25 +443,27 @@ class StudySession:
             f"不认识 {len(self.unknown_words)} | 已抽查 {self.review_count}"
         )
 
+    def _segment_active_entries(self) -> list[Entry]:
+        """复习段未完成时只从复习池随机抽；否则从新学池随机抽。"""
+        review_active = [e for e in self.active_pool if e.word in self.review_word_set]
+        if review_active:
+            return review_active
+        if self.new_word_set:
+            new_active = [e for e in self.active_pool if e.word in self.new_word_set]
+            if new_active:
+                return new_active
+        fallback = [e for e in self.active_pool if e.word not in self.review_word_set]
+        return fallback if fallback else list(self.active_pool)
+
     def _pick_next_word(self) -> Entry | None:
-        if not self.active_pool:
+        pool = self._segment_active_entries()
+        if not pool:
             return None
-        if len(self.active_pool) == 1:
-            return self.active_pool[0]
-        if self.sequential_order:
-            cur = self.current.word if self.current else ""
-            passed_current = not cur
-            for entry in self.active_pool:
-                if passed_current:
-                    return entry
-                if entry.word == cur:
-                    passed_current = True
-            for entry in self.active_pool:
-                if entry.word != cur:
-                    return entry
-            return self.active_pool[0]
-        candidates = [e for e in self.active_pool if e.word != (self.current.word if self.current else "")]
-        bucket = candidates if candidates else self.active_pool
+        if len(pool) == 1:
+            return pool[0]
+        cur = self.current.word if self.current else ""
+        candidates = [e for e in pool if e.word != cur]
+        bucket = candidates if candidates else pool
         return random.choice(bucket)
 
     def _show_current_word(self) -> None:
@@ -444,6 +506,29 @@ class StudySession:
         example_phrase = (self.current.example_phrase or "").strip() if self.current else ""
 
         word_progress = self._word_progress_payload(self.current.word)
+        reinforce_stage = self._reinforce_stage_of(self.current.word)
+
+        if reinforce_stage >= 2 and not self.waiting_next_after_meaning:
+            labels = {2: "四选一", 3: "填空"}
+            return {
+                "phase": "reinforce_quiz",
+                "quizStage": reinforce_stage,
+                "word": self.current.word,
+                "meaning": labels.get(reinforce_stage, "巩固测验"),
+                "meta": self._meta_text(),
+                "phonetic": phonetic,
+                "examplePhrase": "",
+                "wordProgress": word_progress,
+                "ui": {
+                    "startEnabled": False,
+                    "startLabel": "开始学习",
+                    "knownEnabled": False,
+                    "unknownEnabled": False,
+                    "showMistake": True,
+                    "showNext": False,
+                    "showQuiz": True,
+                },
+            }
 
         if self.waiting_next_after_meaning:
             if self.current.display_meaning is not None:
@@ -503,15 +588,35 @@ class StudySession:
         self.review_mode = "unknown"
         return self.state()
 
+    def current_entry(self) -> Entry | None:
+        return self.current
+
+    def quiz_context(self) -> dict[str, Any] | None:
+        if not self.current:
+            return None
+        word = self.current.word
+        stage = self._reinforce_stage_of(word)
+        if stage < 2:
+            return None
+        return {
+            "word": word,
+            "stage": stage,
+            "variant": int(self.mcq_variant.get(word, 0)),
+        }
+
     def mistake_after_known(self) -> dict:
-        if not self.current or not self.waiting_next_after_meaning or self.review_mode != "known":
+        if not self.current:
+            return self.state()
+        if self._reinforce_stage_of(self.current.word) >= 2:
+            self.back_to_reinforce_stage1()
+            return self.state()
+        if not self.waiting_next_after_meaning or self.review_mode != "known":
             return self.state()
         word = self.current.word
         self._mark_reinforce(word)
         self.fuzzy_words.add(word)
         self.remembered_words.discard(word)
         self.unknown_words.discard(word)
-        self._requeue_to_end(word)
         self.waiting_next_after_meaning = False
         self.review_mode = ""
         self._show_current_word()
@@ -524,30 +629,17 @@ class StudySession:
             word = self.current.word
             if self.review_mode == "known":
                 if word in self.word_reinforce:
-                    streak = self.word_streaks.get(word, 0) + 1
-                    self.word_streaks[word] = streak
-                    if streak >= REINFORCE_STREAK_REQUIRED:
-                        self._graduate_word(word)
-                    else:
-                        self._requeue_to_end(word)
+                    if self._reinforce_stage_of(word) == 1:
+                        self.reinforce_stage[word] = 2
+                        self.waiting_next_after_meaning = False
+                        self.review_mode = ""
+                        return self.state()
                 else:
                     self._graduate_word(word)
             elif self.review_mode == "unknown":
                 self._mark_reinforce(word)
-                self._requeue_to_end(word)
         self._show_current_word()
         return self.state()
-
-    def peek_word_completed_on_next(self) -> str | None:
-        """若下一次 next 会算作「今日完成」，返回该词（调用 next 前使用）。"""
-        if (
-            self.waiting_next_after_meaning
-            and self.review_mode == "known"
-            and self.current
-            and self._will_graduate_on_known_next(self.current.word)
-        ):
-            return self.current.word
-        return None
 
 
 def run_session(words: list[Entry], count: int, seed: int | None) -> None:

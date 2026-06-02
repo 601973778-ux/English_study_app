@@ -152,6 +152,8 @@ Spoken_model/rag/index/
 Spoken_model/dialogue/user_data/sessions/
 Spoken_model/dialogue/user_data/sessions/*.json
 Spoken_model/dialogue/user_data/sessions/*.tmp
+Spoken_model/dialogue/user_data/llm_settings.json
+Spoken_model/dialogue/user_data/llm_settings.json.*.tmp
 
 # Environments
 .env

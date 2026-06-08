@@ -189,7 +189,7 @@
           answer: answer,
         });
         const fb = document.getElementById("feedback");
-        fb.textContent = data.feedback || (data.correct ? "回答正确" : "回答不正确");
+        fb.textContent = data.correct ? "回答正确" : "回答不正确";
         fb.className = "mt-4 text-sm " + (data.correct ? "text-green-700" : "text-amber-700");
         fb.classList.remove("hidden");
         if (data.finished && data.result) {

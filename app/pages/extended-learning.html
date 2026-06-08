@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>拓展学习 · 单词学习</title>
+<script src="https://modao.cc/agent-py/static/source/js/tailwindcss.3.4.3.js"></script>
+<script src="https://modao.cc/agent-py/static/source/js/iconify-icon.min.1.0.7.js"></script>
+<style>
+  body { background: #F4F4F4; font-family: system-ui, sans-serif; }
+</style>
+</head>
+<body class="min-h-screen p-8">
+  <div class="max-w-2xl mx-auto bg-white rounded-xl shadow-sm border border-gray-200 p-8">
+    <h1 class="text-2xl font-bold text-gray-900 mb-2 flex items-center gap-2">
+      <iconify-icon icon="ph:books-bold" class="text-indigo-600 text-3xl"></iconify-icon>
+      拓展学习
+    </h1>
+    <p class="text-sm text-gray-500 mb-6">针对「实在学不会」的单词进行深度拓展（功能开发中）</p>
+
+    <div class="rounded-lg border border-indigo-100 bg-indigo-50 p-5 mb-6">
+      <p class="text-xs font-semibold uppercase tracking-wider text-indigo-600 mb-1">当前单词</p>
+      <p id="wordDisplay" class="text-3xl font-bold text-gray-900">—</p>
+    </div>
+
+    <div class="rounded-lg border border-amber-100 bg-amber-50 p-4 mb-8 text-sm text-amber-900 leading-relaxed">
+      <p class="font-semibold mb-1 flex items-center gap-1">
+        <iconify-icon icon="ph:hard-hat-bold"></iconify-icon> 即将上线
+      </p>
+      <p>此处将提供词根拆解、例句精讲、形近词对比、AI 助记等拓展内容。当前仅为占位页，便于从背单词流程跳转。</p>
+    </div>
+
+    <div class="flex flex-wrap gap-3">
+      <a id="backStudy" href="/app/index.html"
+        class="px-5 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-semibold inline-flex items-center gap-1 hover:bg-blue-500">
+        <iconify-icon icon="ph:arrow-left-bold"></iconify-icon> 返回单词背诵
+      </a>
+    </div>
+  </div>
+
+  <script>
+    (function init() {
+      const params = new URLSearchParams(window.location.search);
+      const word = (params.get("word") || "").trim();
+      document.getElementById("wordDisplay").textContent = word || "（未指定单词）";
+    })();
+  </script>
+</body>
+</html>

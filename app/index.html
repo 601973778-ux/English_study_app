@@ -223,6 +223,11 @@
             class="px-6 py-2.5 rounded-lg bg-blue-600 text-white font-semibold text-sm hover:bg-blue-700 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
             下一个 <iconify-icon icon="ph:arrow-right-bold" class="ml-1"></iconify-icon>
           </button>
+          <button id="extended-learning" type="button" hidden disabled
+            class="w-full sm:w-auto px-5 py-2.5 rounded-lg border border-indigo-300 text-indigo-800 bg-indigo-50 font-semibold text-sm hover:bg-indigo-100 transition-all disabled:opacity-40 disabled:cursor-not-allowed">
+            <iconify-icon icon="ph:books-bold" class="mr-1"></iconify-icon>
+            实在学不会这个单词？进行拓展学习吧！
+          </button>
         </div>
       </div>
 
@@ -409,6 +414,7 @@
   const btnUnknown = $("unknown");
   const btnMistake = $("mistake");
   const btnNext = $("next");
+  const btnExtendedLearning = $("extended-learning");
   const errBanner = $("err-banner");
   const errText = $("err-text");
   const similarWordsPanel = $("similarWordsPanel");
@@ -636,6 +642,13 @@
     return Math.max(0, Math.round(newWords * b / a));
   }
 
+  function effectiveReviewDisplay(quota, learnedCount) {
+    const q = Math.max(0, parseInt(String(quota), 10) || 0);
+    const learned = Math.max(0, parseInt(String(learnedCount), 10) || 0);
+    if (learned <= 0) return 0;
+    return Math.min(q, learned);
+  }
+
   function applyGoalFromSettings() {
     const n = Math.max(1, parseInt(String(cachedSettings.daily_words || 50), 10) || 50);
     $("goal-total").textContent = String(n);
@@ -696,11 +709,14 @@
     const newT = hasTodayPlan
       ? (prog.new_target ?? 0)
       : Math.max(1, parseInt(String(cachedSettings.daily_words || 50), 10) || 50);
-    const revT = hasTodayPlan
-      ? (prog.review_target ?? 0)
+    const reviewQuota = hasTodayPlan
+      ? (prog.review_quota ?? prog.review_target ?? 0)
       : expectedReviewTarget(newT, cachedSettings.review_ratio);
+    const revT = prog.review_target != null
+      ? prog.review_target
+      : effectiveReviewDisplay(reviewQuota, prog.learned_words_count ?? 0);
     if (progReviewDone) progReviewDone.textContent = String(prog.review_completed ?? 0);
-    if (progReviewTotal) progReviewTotal.textContent = String(hasTodayPlan ? (prog.review_target ?? 0) : revT);
+    if (progReviewTotal) progReviewTotal.textContent = String(revT);
     if (progNewDone) progNewDone.textContent = String(prog.new_completed ?? 0);
     if (progNewTotal) progNewTotal.textContent = String(hasTodayPlan ? (prog.new_target ?? 0) : newT);
 
@@ -744,6 +760,13 @@
     btnMistake.disabled = !ui.showMistake;
     btnNext.hidden = !ui.showNext;
     btnNext.disabled = !ui.showNext;
+    const showExtended =
+      inMeaning
+      || (state.phase === "question" && wp.reinforce && Number(wp.stage) === 1);
+    if (btnExtendedLearning) {
+      btnExtendedLearning.hidden = !showExtended;
+      btnExtendedLearning.disabled = !showExtended;
+    }
     btnSpeak.hidden = !(inMeaning || inQuiz);
     btnSpeak.disabled = !(inMeaning || inQuiz);
 
@@ -826,6 +849,18 @@
   btnNext.addEventListener("click", async () => {
     try { render(await apiPost("/api/next")); } catch (e) { showError(e.message); }
   });
+  if (btnExtendedLearning) {
+    btnExtendedLearning.addEventListener("click", async () => {
+      const word = (elWord.textContent || "").trim();
+      if (!word || word === "点击「开始学习」" || word.includes("今日学习")) return;
+      btnExtendedLearning.disabled = true;
+      try {
+        await apiPost("/api/session/save");
+      } catch (_) { /* 尽力保存会话 */ }
+      const q = new URLSearchParams({ word });
+      window.location.href = "/app/pages/extended-learning.html?" + q.toString();
+    });
+  }
 
   let currentAudioUrl = null;
   btnSpeak.addEventListener("click", async () => {

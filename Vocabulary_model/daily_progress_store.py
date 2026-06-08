@@ -305,7 +305,7 @@ class DailyProgressStore:
         planned = list(segments["planned_words"])
         scheduled = int(segments["planned_count"])
         new_quota = int(segments["new_target"])
-        review_quota = int(segments["review_target"])
+        review_quota = int(segments.get("review_quota", segments["review_target"]))
         completed = list(completed_words)
         completed_set = set(completed)
         remaining = [w for w in planned if w not in completed_set]
@@ -331,6 +331,87 @@ class DailyProgressStore:
         bucket["session"] = None
         self._save(data)
         return plan
+
+    def reconcile_review_with_learned_pool(
+        self,
+        wordbook_id: str,
+        *,
+        learned_words: list[str],
+        review_quota: int,
+        all_entry_words: list[str],
+    ) -> bool:
+        """修正进行中的今日计划：复习词仅限已学池，且不超过 min(配额, 已学数)。"""
+        data = self._load()
+        bucket = self._bucket(data, wordbook_id)
+        today = today_key(self.tz_name)
+        plan = bucket["plans"].get(today)
+        if not isinstance(plan, dict) or plan.get("status") != "in_progress":
+            return False
+
+        word_set = set(all_entry_words)
+        learned_all_cf = {
+            str(w).strip().casefold() for w in learned_words if str(w).strip()
+        }
+        learned_in_book: dict[str, str] = {}
+        for w in learned_words:
+            w = str(w).strip()
+            if w and w in word_set:
+                learned_in_book[w.casefold()] = w
+        cap = min(max(0, int(review_quota)), len(learned_all_cf))
+        old_rw = list(plan.get("review_words") or [])
+        invalid = any(w.casefold() not in learned_all_cf for w in old_rw)
+        if not invalid and len(old_rw) <= cap:
+            return False
+
+        completed = list(plan.get("completed_words") or [])
+        completed_set = set(completed)
+        new_rw: list[str] = []
+        seen_rw: set[str] = set()
+        for w in old_rw:
+            if len(new_rw) >= cap:
+                break
+            w = str(w).strip()
+            k = w.casefold()
+            if not w or k not in learned_all_cf or k in seen_rw:
+                continue
+            canonical = learned_in_book.get(k, w)
+            new_rw.append(canonical)
+            seen_rw.add(k)
+
+        if len(new_rw) < cap:
+            pool = [
+                learned_in_book[k]
+                for k in learned_in_book
+                if k not in seen_rw
+            ]
+            random.shuffle(pool)
+            for w in pool:
+                if len(new_rw) >= cap:
+                    break
+                k = w.casefold()
+                if k in seen_rw:
+                    continue
+                new_rw.append(w)
+                seen_rw.add(k)
+
+        new_words = list(plan.get("new_words") or [])
+        new_planned = new_rw + new_words
+        remaining = [w for w in new_planned if w not in completed_set]
+        plan.update(
+            {
+                "review_words": new_rw,
+                "planned_words": new_planned,
+                "review_target": len(new_rw),
+                "review_quota": max(0, int(review_quota)),
+                "review_shortfall": max(0, int(review_quota) - len(new_rw)),
+                "target": len(completed) + len(remaining),
+                "planned_count": len(new_planned),
+                "updated_at": _utc_now_iso(),
+            }
+        )
+        bucket["session"] = None
+        self._save(data)
+        return True
 
     def expire_today_plan(self, wordbook_id: str) -> None:
         today = today_key(self.tz_name)
@@ -503,11 +584,13 @@ def build_daily_plan_segments(
     carryover_new_words: list[str] | None = None,
     carryover_words: list[str] | None = None,
     exclude_words: list[str] | None = None,
+    learned_words: list[str] | None = None,
     seed: int | None = None,
 ) -> dict[str, Any]:
     """
     今日计划：复习段、新学段各自有配额（来自用户设置）。
     昨日未完成词优先占用对应段配额，不足再从词库/已学池补足；不会「carryover + 配额」叠成 100。
+    已学词不足复习配额时，复习段最多排入全部已学词。
     """
     rng = random.Random(seed)
     word_set = set(all_entry_words)
@@ -516,18 +599,46 @@ def build_daily_plan_segments(
     }
     new_quota = max(0, int(new_target))
     review_quota = max(0, int(review_target))
+    learned_cf: set[str] | None = None
+    learned_in_book: dict[str, str] = {}
+    if learned_words is not None:
+        learned_cf = {
+            str(w).strip().casefold()
+            for w in learned_words
+            if str(w).strip()
+        }
+        for w in learned_words:
+            w = str(w).strip()
+            if w and w in word_set:
+                learned_in_book[w.casefold()] = w
+        review_quota = min(review_quota, len(learned_cf))
 
     legacy_carry = list(carryover_words or [])
     carry_review = list(carryover_review_words or []) + legacy_carry
     carry_new = list(carryover_new_words or [])
+    if learned_cf is not None:
+        carry_review = [
+            w for w in carry_review if str(w).strip().casefold() in learned_cf
+        ]
+        review_words = [
+            w for w in review_words if str(w).strip().casefold() in learned_cf
+        ]
 
-    def add_word(bucket: list[str], w: str, limit: int) -> bool:
+    def add_word(
+        bucket: list[str],
+        w: str,
+        limit: int,
+        *,
+        require_learned: bool = False,
+    ) -> bool:
         if len(bucket) >= limit:
             return False
         w = str(w).strip()
         if not w or w not in word_set:
             return False
         k = w.casefold()
+        if require_learned and learned_cf is not None and k not in learned_cf:
+            return False
         if k in seen:
             return False
         seen.add(k)
@@ -539,11 +650,18 @@ def build_daily_plan_segments(
     for w in carry_review:
         if len(review_list) >= review_quota:
             break
-        add_word(review_list, w, review_quota)
+        add_word(review_list, w, review_quota, require_learned=True)
     for w in review_words:
         if len(review_list) >= review_quota:
             break
-        add_word(review_list, w, review_quota)
+        add_word(review_list, w, review_quota, require_learned=True)
+    if learned_cf is not None and len(review_list) < review_quota:
+        pool = list(learned_in_book.values())
+        rng.shuffle(pool)
+        for w in pool:
+            if len(review_list) >= review_quota:
+                break
+            add_word(review_list, w, review_quota, require_learned=True)
 
     new_list: list[str] = []
     rng.shuffle(carry_new)
@@ -567,5 +685,6 @@ def build_daily_plan_segments(
         "target": scheduled,
         "planned_count": scheduled,
         "new_target": new_quota,
-        "review_target": review_quota,
+        "review_quota": review_quota,
+        "review_target": len(review_list),
     }

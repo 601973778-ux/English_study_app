@@ -52,6 +52,7 @@ from Vocabulary_model.wordbook_entries_cache import get_entries, invalidate_entr
 from Vocabulary_model.daily_progress_store import DailyProgressStore  # noqa: E402
 from Vocabulary_model.daily_session_service import (  # noqa: E402
     _merge_progress,
+    enrich_progress_payload,
     idle_progress_state,
     on_session_action,
     save_user_settings_with_plan,
@@ -174,8 +175,13 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
     def _api_state(self) -> dict:
         wid, label, entries = self._wordbook_context()
         if _SESSION is None:
-            return idle_progress_state(len(entries), wid, label)
-        return _merge_progress(_SESSION.state(), _DAILY_STORE.progress_payload(wid))
+            return idle_progress_state(len(entries), wid, label, review_store=_REVIEW_STORE)
+        progress = enrich_progress_payload(
+            _DAILY_STORE.progress_payload(wid),
+            wordbook_id=wid,
+            review_store=_REVIEW_STORE,
+        )
+        return _merge_progress(_SESSION.state(), progress)
 
     def _entry_for_word(self, word: str, entries: list) -> Any:
         target = str(word or "").strip().casefold()
@@ -191,11 +197,16 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
         clean = str(graduated_word or "").strip()
         if clean:
             _REVIEW_STORE.mark_learned_words([clean], wordbook_id=wid)
-            _REVIEW_STORE.mark_proficient(clean, wordbook_id=wid)
-        for w in _SESSION.fuzzy_words:
-            _REVIEW_STORE.mark_fuzzy(w, wordbook_id=wid)
-        for w in _SESSION.unknown_words:
-            _REVIEW_STORE.mark_unfamiliar(w, wordbook_id=wid)
+
+    def _record_self_rating(self, choice: str | None) -> None:
+        if not choice or _SESSION is None or not _SESSION.current:
+            return
+        wid = str(load_user_settings().get("wordbook_id", "cet6"))
+        _REVIEW_STORE.record_self_rating(
+            _SESSION.current.word,
+            choice,
+            wordbook_id=wid,
+        )
 
     def do_GET(self) -> None:
         req_path, req_query = self._parsed_request()
@@ -345,7 +356,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                     self._send_json({"ok": True})
                     return
                 wid, _, _ = self._wordbook_context()
-                on_session_action(_DAILY_STORE, wid, _SESSION)
+                on_session_action(_DAILY_STORE, wid, _SESSION, review_store=_REVIEW_STORE)
                 self._send_json({"ok": True})
                 return
             if req_path == "/api/tts-config":
@@ -476,21 +487,27 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 return
             wid, _, _ = self._wordbook_context()
             if req_path == "/api/known":
+                rating = _SESSION.self_rating_event("known")
                 _SESSION.answer_known()
+                self._record_self_rating(rating)
                 self._persist_session_words()
-                self._send_json(on_session_action(_DAILY_STORE, wid, _SESSION))
+                self._send_json(on_session_action(_DAILY_STORE, wid, _SESSION, review_store=_REVIEW_STORE))
                 return
             if req_path == "/api/unknown":
+                rating = _SESSION.self_rating_event("unknown")
                 _SESSION.answer_unknown()
+                self._record_self_rating(rating)
                 self._persist_session_words()
-                self._send_json(on_session_action(_DAILY_STORE, wid, _SESSION))
+                self._send_json(on_session_action(_DAILY_STORE, wid, _SESSION, review_store=_REVIEW_STORE))
                 return
             if req_path == "/api/mistake":
                 if _SESSION.current:
                     clear_pending_for_word(_SESSION.current.word)
+                rating = _SESSION.self_rating_event("mistake")
                 _SESSION.mistake_after_known()
+                self._record_self_rating(rating)
                 self._persist_session_words()
-                self._send_json(on_session_action(_DAILY_STORE, wid, _SESSION))
+                self._send_json(on_session_action(_DAILY_STORE, wid, _SESSION, review_store=_REVIEW_STORE))
                 return
             if req_path == "/api/quiz/generate":
                 ctx = _SESSION.quiz_context()
@@ -506,7 +523,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                     entries=entries,
                     wordbook_id=wid,
                 )
-                body = on_session_action(_DAILY_STORE, wid, _SESSION)
+                body = on_session_action(_DAILY_STORE, wid, _SESSION, review_store=_REVIEW_STORE)
                 body["quiz"] = quiz
                 self._send_json(body)
                 return
@@ -523,7 +540,7 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 done = _SESSION.apply_quiz_result(str(result.get("word") or ""), result)
                 self._persist_session_words(graduated_word=done)
                 body = on_session_action(
-                    _DAILY_STORE, wid, _SESSION, just_completed_word=done
+                    _DAILY_STORE, wid, _SESSION, just_completed_word=done, review_store=_REVIEW_STORE
                 )
                 body["quizResult"] = result
                 self._send_json(body)
@@ -534,7 +551,11 @@ class AppHandler(http.server.SimpleHTTPRequestHandler):
                 self._persist_session_words(graduated_word=done)
                 self._send_json(
                     on_session_action(
-                        _DAILY_STORE, wid, _SESSION, just_completed_word=done
+                        _DAILY_STORE,
+                        wid,
+                        _SESSION,
+                        just_completed_word=done,
+                        review_store=_REVIEW_STORE,
                     )
                 )
                 return

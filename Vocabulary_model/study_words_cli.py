@@ -588,6 +588,23 @@ class StudySession:
             },
         }
 
+    def self_rating_event(self, action: Literal["known", "unknown", "mistake"]) -> str | None:
+        """返回应写入滑动窗口的自评（k/u），无需记录时返回 None。"""
+        if not self.current:
+            return None
+        stage = self._reinforce_stage_of(self.current.word)
+        if action == "mistake":
+            if stage >= 2:
+                return None
+            return "u"
+        if action in ("known", "unknown"):
+            if stage >= 2:
+                return None
+            if self.waiting_next_after_meaning:
+                return None
+            return "k" if action == "known" else "u"
+        return None
+
     def answer_known(self) -> dict:
         if not self.current or self.waiting_next_after_meaning:
             return self.state()

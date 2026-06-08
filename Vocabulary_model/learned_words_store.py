@@ -18,7 +18,63 @@ DATA_DIR = Path(__file__).resolve().parent / "user_data"
 LEARNED_WORDS_FILE = DATA_DIR / "learned_words.json"
 FILE_VERSION = 1
 
-VALID_PROFICIENCY = frozenset({"unclassified", "proficient", "fuzzy", "unfamiliar"})
+SELF_RATING_WINDOW_SIZE = 3
+VALID_SELF_RATING_CHOICES = frozenset({"k", "u"})
+
+
+def _empty_self_rating_window() -> dict[str, Any]:
+    return {
+        "recent": [],
+        "known_count": 0,
+        "unknown_count": 0,
+        "window_size": SELF_RATING_WINDOW_SIZE,
+        "window_full": False,
+    }
+
+
+def _push_self_rating_window(window: dict[str, Any], choice: str) -> None:
+    if choice not in VALID_SELF_RATING_CHOICES:
+        raise ValueError("choice must be k or u")
+    size = SELF_RATING_WINDOW_SIZE
+    recent = list(window.get("recent") or [])
+    if len(recent) > size:
+        recent = recent[-size:]
+    known = sum(1 for x in recent if x == "k")
+    unknown = sum(1 for x in recent if x == "u")
+
+    recent.append(choice)
+    if choice == "k":
+        known += 1
+    else:
+        unknown += 1
+
+    while len(recent) > size:
+        dropped = recent.pop(0)
+        if dropped == "k":
+            known -= 1
+        else:
+            unknown -= 1
+
+    window["recent"] = recent
+    window["known_count"] = known
+    window["unknown_count"] = unknown
+    window["window_size"] = size
+    window["window_full"] = len(recent) >= size
+    if window["window_full"]:
+        window["known_ratio"] = round(known / size, 4)
+    else:
+        window.pop("known_ratio", None)
+
+
+def _new_word_row(word: str, *, now: str | None = None) -> dict[str, Any]:
+    ts = now or _utc_now_iso()
+    return {
+        "word": word,
+        "first_learned_at": ts,
+        "last_seen_at": ts,
+        "total_seen": 0,
+        "self_rating_window": _empty_self_rating_window(),
+    }
 
 
 def _utc_now_iso() -> str:
@@ -64,6 +120,10 @@ class LearnedWordsFileStore:
         data["version"] = FILE_VERSION
         save_json_atomic(self.path, data)
 
+    def clear_all(self) -> None:
+        """清空全部已学单词记录。"""
+        self._save(_empty_root())
+
     def _words_map(self, data: dict[str, Any], wordbook_id: str) -> dict[str, dict[str, Any]]:
         wid = _normalize_wordbook_id(wordbook_id)
         wb = data["wordbooks"].setdefault(wid, _empty_wordbook())
@@ -87,16 +147,8 @@ class LearnedWordsFileStore:
                 row["last_seen_at"] = now
                 row["total_seen"] = int(row.get("total_seen", 0)) + 1
             else:
-                bucket[word] = {
-                    "word": word,
-                    "first_learned_at": now,
-                    "last_seen_at": now,
-                    "total_seen": 1,
-                    "proficiency": "unclassified",
-                    "correct_count": 0,
-                    "fuzzy_count": 0,
-                    "incorrect_count": 0,
-                }
+                bucket[word] = _new_word_row(word, now=now)
+                bucket[word]["total_seen"] = 1
         self._save(data)
         return len(clean)
 
@@ -105,53 +157,49 @@ class LearnedWordsFileStore:
         bucket = self._words_map(data, wordbook_id or DEFAULT_WORDBOOK_ID)
         return list(bucket.keys())
 
-    def set_proficiency(self, word: str, proficiency: str, wordbook_id: str | None = None) -> bool:
-        if proficiency not in VALID_PROFICIENCY:
-            raise ValueError(f"invalid proficiency: {proficiency}")
+    def record_self_rating(
+        self,
+        word: str,
+        choice: str,
+        wordbook_id: str | None = None,
+    ) -> dict[str, Any]:
+        """记录阶段 1 自评（k=认识，u=不认识），维护最近 3 次滑动窗口。"""
         clean = str(word).strip()
         if not clean:
-            return False
+            raise ValueError("word is required")
+        if choice not in VALID_SELF_RATING_CHOICES:
+            raise ValueError("choice must be k or u")
+
+        now = _utc_now_iso()
         data = self._load()
         bucket = self._words_map(data, wordbook_id or DEFAULT_WORDBOOK_ID)
         if clean not in bucket:
-            return False
-        bucket[clean]["proficiency"] = proficiency
-        bucket[clean]["last_seen_at"] = _utc_now_iso()
+            bucket[clean] = _new_word_row(clean, now=now)
+        row = bucket[clean]
+        window = row.get("self_rating_window")
+        if not isinstance(window, dict):
+            window = _empty_self_rating_window()
+        _push_self_rating_window(window, choice)
+        row["self_rating_window"] = window
+        row["last_seen_at"] = now
         self._save(data)
-        return True
+        return dict(window)
 
-    def update_answer_result(
-        self, word: str, result: str, wordbook_id: str | None = None
-    ) -> bool:
+    def get_self_rating_window(
+        self, word: str, wordbook_id: str | None = None
+    ) -> dict[str, Any] | None:
         clean = str(word).strip()
         if not clean:
-            return False
-        column_map = {
-            "correct": "correct_count",
-            "fuzzy": "fuzzy_count",
-            "incorrect": "incorrect_count",
-        }
-        column = column_map.get(str(result))
-        if not column:
-            raise ValueError("result must be one of: correct, fuzzy, incorrect")
-
+            return None
         data = self._load()
         bucket = self._words_map(data, wordbook_id or DEFAULT_WORDBOOK_ID)
-        if clean not in bucket:
-            return False
-        bucket[clean][column] = int(bucket[clean].get(column, 0)) + 1
-        bucket[clean]["last_seen_at"] = _utc_now_iso()
-        self._save(data)
-        return True
-
-    def get_words_by_proficiency(
-        self, proficiency: str, wordbook_id: str | None = None
-    ) -> list[str]:
-        if proficiency not in VALID_PROFICIENCY:
-            raise ValueError(f"invalid proficiency: {proficiency}")
-        data = self._load()
-        bucket = self._words_map(data, wordbook_id or DEFAULT_WORDBOOK_ID)
-        return [w for w, row in bucket.items() if row.get("proficiency") == proficiency]
+        row = bucket.get(clean)
+        if not row:
+            return None
+        window = row.get("self_rating_window")
+        if not isinstance(window, dict):
+            return _empty_self_rating_window()
+        return dict(window)
 
     def get_learning_stats(
         self, wordbook_id: str | None = None, limit: int = 200
@@ -163,25 +211,13 @@ class LearnedWordsFileStore:
         rows = list(bucket.values())
         rows.sort(key=lambda r: str(r.get("last_seen_at", "")), reverse=True)
 
-        proficient = fuzzy = unfamiliar = unclassified = 0
-        for row in rows:
-            p = str(row.get("proficiency", "unclassified"))
-            if p == "proficient":
-                proficient += 1
-            elif p == "fuzzy":
-                fuzzy += 1
-            elif p == "unfamiliar":
-                unfamiliar += 1
-            else:
-                unclassified += 1
-
         words = [
             {
                 "word": str(row.get("word", "")),
-                "proficiency": str(row.get("proficiency", "unclassified")),
                 "first_learned_at": str(row.get("first_learned_at", "")),
                 "last_seen_at": str(row.get("last_seen_at", "")),
                 "total_seen": int(row.get("total_seen", 0)),
+                "self_rating_window": row.get("self_rating_window"),
             }
             for row in rows[:safe_limit]
         ]
@@ -189,9 +225,5 @@ class LearnedWordsFileStore:
             "wordbook_id": wid,
             "storage_file": str(self.path),
             "total_learned": len(rows),
-            "proficient_count": proficient,
-            "fuzzy_count": fuzzy,
-            "unfamiliar_count": unfamiliar,
-            "unclassified_count": unclassified,
             "words": words,
         }

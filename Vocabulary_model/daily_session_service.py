@@ -33,6 +33,42 @@ def _merge_progress(state: dict[str, Any], progress: dict[str, Any]) -> dict[str
     return out
 
 
+def effective_review_display(review_quota: int, learned_count: int) -> int:
+    """已学词不足复习配额时，复习段按实际已学词数展示与排入。"""
+    quota = max(0, int(review_quota))
+    learned = max(0, int(learned_count))
+    if learned <= 0:
+        return 0
+    return min(quota, learned)
+
+
+def enrich_progress_payload(
+    progress: dict[str, Any],
+    *,
+    wordbook_id: str,
+    review_store: Any,
+) -> dict[str, Any]:
+    out = dict(progress)
+    learned_n = int(review_store.count_learned_words(wordbook_id=wordbook_id))
+    out["learned_words_count"] = learned_n
+    quota = out.get("review_quota")
+    if quota is None and out.get("status") == "none":
+        settings = load_user_settings()
+        _, rev_q = compute_daily_quotas(
+            int(settings.get("daily_words", 50)),
+            str(settings.get("review_ratio", "1:1")),
+        )
+        quota = rev_q
+        out["review_quota"] = rev_q
+    if quota is not None:
+        out["review_quota"] = int(quota)
+        display_target = effective_review_display(int(quota), learned_n)
+        out["review_target"] = display_target
+        rc = int(out.get("review_completed", 0) or 0)
+        out["review_remaining"] = max(0, display_target - rc)
+    return out
+
+
 def _idle_state(
     *,
     meta: str,
@@ -84,12 +120,19 @@ def ensure_today_plan(
 ) -> dict[str, Any]:
     store.rollover_if_needed(wordbook_id)
     plan = store.get_today_plan(wordbook_id)
-    if plan is not None:
-        return plan
-
     new_target, review_quota = compute_daily_quotas(int(daily_words), review_ratio)
-    new_target = max(1, min(new_target, len(entries)))
+    learned_list = review_store.list_learned_words(wordbook_id=wordbook_id)
     all_words = [e.word for e in entries]
+    if plan is not None:
+        store.reconcile_review_with_learned_pool(
+            wordbook_id,
+            learned_words=learned_list,
+            review_quota=review_quota,
+            all_entry_words=all_words,
+        )
+        return store.get_today_plan(wordbook_id) or plan
+
+    new_target = max(1, min(new_target, len(entries)))
     review_plan = review_store.build_review_plan(
         new_target, review_ratio, wordbook_id=wordbook_id
     )
@@ -102,6 +145,7 @@ def ensure_today_plan(
         review_words=review_plan.review_words,
         carryover_review_words=carryover_review,
         carryover_new_words=carryover_new,
+        learned_words=learned_list,
     )
     carry_r_set = {w.casefold() for w in carryover_review}
     carry_n_set = {w.casefold() for w in carryover_new}
@@ -116,7 +160,7 @@ def ensure_today_plan(
         review_words=list(segments["review_words"]),
         new_words=list(segments["new_words"]),
         new_target=int(segments["new_target"]),
-        review_target=int(segments["review_target"]),
+        review_target=int(segments["review_quota"]),
         review_shortfall=int(review_plan.review_shortfall),
         planned_count=int(segments["planned_count"]),
     )
@@ -167,7 +211,11 @@ def start_or_resume(
         review_ratio=ratio,
         review_store=review_store,
     )
-    progress = store.progress_payload(wid)
+    progress = enrich_progress_payload(
+        store.progress_payload(wid),
+        wordbook_id=wid,
+        review_store=review_store,
+    )
 
     if plan.get("status") == "completed":
         return None, _idle_state(
@@ -181,7 +229,11 @@ def start_or_resume(
 
     if not session.active_pool:
         store.clear_session_snapshot(wid)
-        progress = store.progress_payload(wid)
+        progress = enrich_progress_payload(
+            store.progress_payload(wid),
+            wordbook_id=wid,
+            review_store=review_store,
+        )
         return None, _idle_state(
             meta=f"{meta_base} | 今日已完成",
             wordbook=wb,
@@ -198,7 +250,11 @@ def start_or_resume(
         session.start()
 
     save_session_snapshot(store, wid, session)
-    progress = store.progress_payload(wid)
+    progress = enrich_progress_payload(
+        store.progress_payload(wid),
+        wordbook_id=wid,
+        review_store=review_store,
+    )
     state = _merge_progress(session.state(), progress)
     state["meta"] = session._meta_text()
     return session, state
@@ -337,6 +393,7 @@ def rebuild_today_plan(
         carryover_review_words=carry_review,
         carryover_new_words=carry_new,
         exclude_words=completed,
+        learned_words=review_store.list_learned_words(wordbook_id=wordbook_id),
     )
     planned_cf = {w.casefold() for w in segments["planned_words"]}
     store.set_carryover_review_words(
@@ -467,6 +524,7 @@ def on_session_action(
     session: StudySession,
     *,
     just_completed_word: str | None = None,
+    review_store: Any | None = None,
 ) -> dict[str, Any]:
     if just_completed_word:
         store.mark_completed(wordbook_id, just_completed_word)
@@ -475,6 +533,12 @@ def on_session_action(
     else:
         save_session_snapshot(store, wordbook_id, session)
     progress = store.progress_payload(wordbook_id)
+    if review_store is not None:
+        progress = enrich_progress_payload(
+            progress,
+            wordbook_id=wordbook_id,
+            review_store=review_store,
+        )
     return _merge_progress(session.state(), progress)
 
 
@@ -482,6 +546,8 @@ def idle_progress_state(
     entries_count: int,
     wordbook_id: str,
     wordbook_label: str,
+    *,
+    review_store: Any | None = None,
 ) -> dict[str, Any]:
     store = DailyProgressStore()
     store.rollover_if_needed(wordbook_id)
@@ -496,6 +562,12 @@ def idle_progress_state(
             "new_quota": new_t,
             "review_quota": rev_t,
         }
+    if review_store is not None:
+        progress = enrich_progress_payload(
+            progress,
+            wordbook_id=wordbook_id,
+            review_store=review_store,
+        )
     meta = f"「{wordbook_label}」· 词库 {entries_count} 条"
     return _idle_state(
         meta=meta,

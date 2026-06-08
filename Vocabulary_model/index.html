@@ -236,12 +236,9 @@
       <h1 class="title">学习统计</h1>
       <div class="statsGrid">
         <div class="statsItem">已学习总词数：<span id="statsTotal">0</span></div>
-        <div class="statsItem">熟练：<span id="statsProficient">0</span></div>
-        <div class="statsItem">模糊：<span id="statsFuzzy">0</span></div>
-        <div class="statsItem">不熟练：<span id="statsUnfamiliar">0</span></div>
-        <div class="statsItem">未分类：<span id="statsUnclassified">0</span></div>
+        <div class="statsItem">当前词书：<span id="statsWordbook">—</span></div>
       </div>
-      <p class="desc">最近学习过的单词（按最近学习时间倒序）：</p>
+      <p class="desc">分类统计已移除，后续重新设计。以下为最近学习过的单词：</p>
       <ol class="statsWords" id="statsWordsList"></ol>
       <p class="hint" id="statsHint"></p>
       <div class="actions">
@@ -297,10 +294,7 @@
     const statsBackHomeBtn = document.getElementById("statsBackHomeBtn");
 
     const statsTotal = document.getElementById("statsTotal");
-    const statsProficient = document.getElementById("statsProficient");
-    const statsFuzzy = document.getElementById("statsFuzzy");
-    const statsUnfamiliar = document.getElementById("statsUnfamiliar");
-    const statsUnclassified = document.getElementById("statsUnclassified");
+    const statsWordbook = document.getElementById("statsWordbook");
     const statsWordsList = document.getElementById("statsWordsList");
     const statsHint = document.getElementById("statsHint");
 
@@ -422,12 +416,19 @@
       switchView("settings");
     }
 
+    function formatSelfRatingWindow(w) {
+      if (!w || !Array.isArray(w.recent) || !w.recent.length) return "";
+      const parts = w.recent.map((c) => (c === "k" ? "认识" : "不认识"));
+      let tail = "";
+      if (w.window_full && w.known_ratio != null) {
+        tail = ` · 近${w.window_size || 3}次认识率 ${Math.round(Number(w.known_ratio) * 100)}%`;
+      }
+      return ` [${parts.join(" / ")}${tail}]`;
+    }
+
     function renderStats(data) {
       statsTotal.textContent = String(data.total_learned || 0);
-      statsProficient.textContent = String(data.proficient_count || 0);
-      statsFuzzy.textContent = String(data.fuzzy_count || 0);
-      statsUnfamiliar.textContent = String(data.unfamiliar_count || 0);
-      statsUnclassified.textContent = String(data.unclassified_count || 0);
+      statsWordbook.textContent = String(data.wordbook_id || "—");
 
       const words = Array.isArray(data.words) ? data.words : [];
       statsWordsList.innerHTML = "";
@@ -440,8 +441,8 @@
       words.forEach((item) => {
         const li = document.createElement("li");
         const word = item && item.word ? String(item.word) : "";
-        const prof = item && item.proficiency ? String(item.proficiency) : "unclassified";
-        li.textContent = `${word} (${prof})`;
+        const seen = item && item.total_seen != null ? ` · 见过 ${item.total_seen} 次` : "";
+        li.textContent = `${word}${seen}${formatSelfRatingWindow(item && item.self_rating_window)}`;
         statsWordsList.appendChild(li);
       });
     }

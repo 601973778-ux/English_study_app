@@ -144,4 +144,4 @@ def grade_mcq(quiz_id: str, answer: Any) -> tuple[bool, str]:
     correct = selected == correct_index
     if correct:
         return True, "回答正确"
-    return False, f"不正确。{pending['word']} 的释义是「{pending.get('correct_meaning', '')}」。"
+    return False, "回答不正确"
